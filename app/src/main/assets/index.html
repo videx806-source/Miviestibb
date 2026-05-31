@@ -172,6 +172,69 @@
       const [currentStream, setCurrentStream] = useState(null); // { id, title, stream_url, img, category, description, type, isSavedReg }
       const [toastMsg, setToastMsg] = useState('');
 
+      // New Config Management
+      const defaultSettings = {
+        modoOscuroPuro: false,
+        animacionesReducidas: false,
+        autoplayAlSeleccionar: true,
+        reconexionAutomatica: true,
+        calidadPreferida: 'Auto'
+      };
+
+      const [config, setConfig] = useState(() => {
+        try {
+          const saved = localStorage.getItem('videx_config');
+          if (saved) {
+            return { ...defaultSettings, ...JSON.parse(saved) };
+          }
+        } catch (e) {
+          console.error("Error reading videx_config", e);
+        }
+        return defaultSettings;
+      });
+
+      const [configModalOpen, setConfigModalOpen] = useState(false);
+
+      useEffect(() => {
+        try {
+          localStorage.setItem('videx_config', JSON.stringify(config));
+        } catch (e) {
+          console.error("Error saving videx_config", e);
+        }
+      }, [config]);
+
+      // Apply Modo Oscuro Puro background-color directly to native document elements
+      useEffect(() => {
+        document.body.style.backgroundColor = config.modoOscuroPuro ? '#000000' : '#0a0a0f';
+      }, [config.modoOscuroPuro]);
+
+      // Apply Reduced motion override
+      useEffect(() => {
+        const styleId = 'reduced-motion-style';
+        let styleEl = document.getElementById(styleId);
+        if (config.animacionesReducidas) {
+          if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = styleId;
+            styleEl.innerHTML = `
+              * {
+                animation-delay: 0s !important;
+                animation-duration: 0s !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0s !important;
+                transition-delay: 0s !important;
+                scroll-behavior: auto !important;
+              }
+            `;
+            document.head.appendChild(styleEl);
+          }
+        } else {
+          if (styleEl) {
+            styleEl.remove();
+          }
+        }
+      }, [config.animacionesReducidas]);
+
       // Events
       const [eventos, setEventos] = useState([]);
       const [eventsStatus, setEventsStatus] = useState('loading');
@@ -190,7 +253,7 @@
       const [selectedMovie, setSelectedMovie] = useState(null);
       const [movieDetailsStatus, setMovieDetailsStatus] = useState('idle');
 
-      // Recordings Historial from LocalStorage
+      // Recordings Historial from LocalStorage (videx_grabaciones)
       const [recordings, setRecordings] = useState([]);
 
       const triggerToast = (msg) => {
@@ -203,7 +266,24 @@
 
       const loadRecordings = () => {
         try {
-          const stored = localStorage.getItem('videx_recordings');
+          let stored = localStorage.getItem('videx_grabaciones');
+          if (!stored) {
+            // Check legacy
+            stored = localStorage.getItem('videx_recordings');
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              const migrated = parsed.map(item => ({
+                id: item.id || Date.now().toString(),
+                titulo: item.titulo,
+                fecha: item.fecha,
+                duracion: item.duracion,
+                archivo: item.archivo || item.nombreArchivo || `videx_rec_${item.id}.webm`
+              }));
+              localStorage.setItem('videx_grabaciones', JSON.stringify(migrated));
+              localStorage.removeItem('videx_recordings');
+              stored = JSON.stringify(migrated);
+            }
+          }
           if (stored) {
             setRecordings(JSON.parse(stored));
           } else {
@@ -353,7 +433,7 @@
       };
 
       return (
-        <div class="flex flex-col min-h-screen bg-[#0a0a0f] text-white">
+        <div class={`flex flex-col min-h-screen ${config.modoOscuroPuro ? 'bg-black' : 'bg-[#0a0a0f]'} text-white`}>
           
           {/* Header Branding */}
           <header class="bg-[#12121a]/95 border-b border-white/5 py-3.5 px-5 flex justify-between items-center sticky top-0 z-30 backdrop-blur-md">
@@ -364,17 +444,31 @@
               </h1>
             </div>
 
-            {currentStream && activeTab !== 'reproductor' && (
+            <div class="flex items-center space-x-3">
+              {currentStream && activeTab !== 'reproductor' && (
+                <button 
+                  onClick={() => navigateTo('reproductor')}
+                  class="flex items-center space-x-1.5 bg-brandPurple hover:bg-brandPurple/80 transition text-[11px] font-bold px-3 py-1.5 rounded-full text-white shadow-xl live-pulse border border-brandPurple/30"
+                >
+                  <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                  <span>SINTONIZANDO</span>
+                </button>
+              )}
+
+              {/* Gear settings button */}
               <button 
-                onClick={() => navigateTo('reproductor')}
-                class="flex items-center space-x-1.5 bg-brandPurple hover:bg-brandPurple/80 transition text-[11px] font-bold px-3 py-1.5 rounded-full text-white shadow-xl live-pulse border border-brandPurple/30"
+                onClick={() => setConfigModalOpen(true)}
+                class="text-white/60 hover:text-white p-2 rounded-full hover:bg-white/5 transition flex items-center justify-center"
+                title="Configuración"
               >
-                <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z"/>
+                <svg class="w-5 h-5 transition-transform hover:rotate-45 duration-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127c.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.242-.438.613-.43.992a7.723 7.723 0 010 .252c-.008.379.137.75.43.992l1.003.828a1.125 1.125 0 01.26 1.43l-1.296 2.247a1.125 1.125 0 01-1.37.49l-1.216-.456c-.356-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.003-.827c.293-.242.438-.614.43-.992a7.711 7.711 0 010-.252c.008-.379-.137-.75-.43-.992l-1.003-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.49l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128c.332-.183.582-.495.644-.869l.214-1.28z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span>SINTONIZANDO</span>
               </button>
-            )}
+            </div>
           </header>
 
           <main class="flex-grow pb-28">
@@ -906,7 +1000,7 @@
                           <button
                             onClick={() => {
                               const remaining = recordings.filter(item => item.id !== rec.id);
-                              localStorage.setItem('videx_recordings', JSON.stringify(remaining));
+                              localStorage.setItem('videx_grabaciones', JSON.stringify(remaining));
                               setRecordings(remaining);
                               triggerToast('Historial depurado exitosamente.');
                             }}
@@ -937,6 +1031,7 @@
                       setCurrentStream(null);
                     }}
                     onRecordingAdded={loadRecordings}
+                    config={config}
                   />
                 ) : (
                   <div class="text-center py-12 text-white/50 bg-brandSurface rounded-2xl border border-white/5 mx-4">
@@ -951,6 +1046,157 @@
           {/* Fallback internal Toast overlays */}
           {toastMsg && (
             <Toast message={toastMsg} onClose={() => setToastMsg('')} />
+          )}
+
+          {/* Settings Modal (Drawer style) */}
+          {configModalOpen && (
+            <div class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in text-white">
+              <div class="bg-brandSurface border border-white/10 rounded-2xl w-full max-w-sm relative flex flex-col max-h-[85vh] overflow-hidden select-none shadow-2xl">
+                
+                {/* Header */}
+                <div class="p-4 border-b border-white/5 flex justify-between items-center bg-[#161622]">
+                  <h3 class="text-xs font-black uppercase tracking-widest text-brandGold flex items-center space-x-2">
+                    <span>⚙️</span>
+                    <span>Configuración</span>
+                  </h3>
+                  <button 
+                    onClick={() => setConfigModalOpen(false)}
+                    class="text-white/40 hover:text-white bg-white/5 p-1.5 rounded-full"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Body scroll */}
+                <div class="p-5 space-y-5 overflow-y-auto">
+                  
+                  {/* SECCIÓN APARIENCIA */}
+                  <div class="space-y-3">
+                    <h4 class="text-[10px] font-black tracking-widest text-brandPurple uppercase border-b border-brandPurple/10 pb-1">Apariencia</h4>
+                    
+                    {/* Modo Oscuro Puro Toggle */}
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="block text-xs font-bold">Modo oscuro puro</span>
+                        <span class="block text-[9px] text-white/40">Fondo negro absoluto (#000000)</span>
+                      </div>
+                      <button 
+                        onClick={() => setConfig(prev => ({ ...prev, modoOscuroPuro: !prev.modoOscuroPuro }))}
+                        class={`w-11 h-6 rounded-full transition-colors relative ${config.modoOscuroPuro ? 'bg-brandGold' : 'bg-white/10'}`}
+                      >
+                        <span class={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${config.modoOscuroPuro ? 'translate-x-5 bg-black' : ''}`}></span>
+                      </button>
+                    </div>
+
+                    {/* Animaciones Reducidas Toggle */}
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="block text-xs font-bold">Animaciones reducidas</span>
+                        <span class="block text-[9px] text-white/40">Desactiva efectos y transiciones dinámicas</span>
+                      </div>
+                      <button 
+                        onClick={() => setConfig(prev => ({ ...prev, animacionesReducidas: !prev.animacionesReducidas }))}
+                        class={`w-11 h-6 rounded-full transition-colors relative ${config.animacionesReducidas ? 'bg-[#7c3aed]' : 'bg-white/10'}`}
+                      >
+                        <span class={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${config.animacionesReducidas ? 'translate-x-5' : ''}`}></span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* SECCIÓN REPRODUCCIÓN */}
+                  <div class="space-y-3">
+                    <h4 class="text-[10px] font-black tracking-widest text-brandPurple uppercase border-b border-brandPurple/10 pb-1">Reproducción</h4>
+                    
+                    {/* Autoplay Toggle */}
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="block text-xs font-bold">Autoplay al seleccionar</span>
+                        <span class="block text-[9px] text-white/40">Inicia la reproducción automáticamente</span>
+                      </div>
+                      <button 
+                        onClick={() => setConfig(prev => ({ ...prev, autoplayAlSeleccionar: !prev.autoplayAlSeleccionar }))}
+                        class={`w-11 h-6 rounded-full transition-colors relative ${config.autoplayAlSeleccionar ? 'bg-[#7c3aed]' : 'bg-white/10'}`}
+                      >
+                        <span class={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${config.autoplayAlSeleccionar ? 'translate-x-5' : ''}`}></span>
+                      </button>
+                    </div>
+
+                    {/* Reconexión Automática Toggle */}
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="block text-xs font-bold">Reconexión automática</span>
+                        <span class="block text-[9px] text-white/40">Reconecta el stream si se cae</span>
+                      </div>
+                      <button 
+                        onClick={() => setConfig(prev => ({ ...prev, reconexionAutomatica: !prev.reconexionAutomatica }))}
+                        class={`w-11 h-6 rounded-full transition-colors relative ${config.reconexionAutomatica ? 'bg-[#7c3aed]' : 'bg-white/10'}`}
+                      >
+                        <span class={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${config.reconexionAutomatica ? 'translate-x-5' : ''}`}></span>
+                      </button>
+                    </div>
+
+                    {/* Calidad Preferida Selector */}
+                    <div>
+                      <span class="block text-xs font-bold mb-1.5">Calidad preferida</span>
+                      <div class="grid grid-cols-4 gap-1 bg-[#0a0a0f] p-1 rounded-xl border border-white/5">
+                        {['Auto', 'Alta', 'Media', 'Baja'].map(opt => (
+                          <button
+                            key={opt}
+                            onClick={() => setConfig(prev => ({ ...prev, calidadPreferida: opt }))}
+                            class={`py-1 rounded-lg text-[9px] font-bold uppercase transition ${
+                              config.calidadPreferida === opt 
+                                ? 'bg-brandGold text-black' 
+                                : 'text-white/40 hover:text-white'
+                            }`}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECCIÓN GRABACIONES */}
+                  <div class="space-y-3">
+                    <h4 class="text-[10px] font-black tracking-widest text-[#7c3aed] uppercase border-b border-[#7c3aed]/10 pb-1">Grabaciones</h4>
+                    <p class="text-[10px] text-white/45 leading-relaxed font-semibold">
+                      Las grabaciones se descargan en formato .webm automáticamente.
+                    </p>
+                    <button 
+                      onClick={() => {
+                        if (confirm('¿Estás seguro de que deseas limpiar todo el historial de grabaciones? Esta acción no se puede deshacer.')) {
+                          localStorage.removeItem('videx_grabaciones');
+                          setRecordings([]);
+                          triggerToast('Historial de grabaciones eliminado.');
+                        }
+                      }}
+                      class="w-full bg-red-500/10 hover:bg-red-600 hover:text-white transition-all text-red-500 font-bold uppercase text-[9px] tracking-widest py-2 rounded-xl border border-red-500/10"
+                    >
+                      LIMPIAR HISTORIAL DE GRABACIONES
+                    </button>
+                  </div>
+
+                  {/* SECCIÓN ACERCA DE */}
+                  <div class="space-y-2 bg-[#0a0a0f] p-3 rounded-xl border border-white/5">
+                    <div class="flex items-center space-x-2">
+                      <span class="w-2 h-4 bg-brandGold rounded-full shadow-lg shadow-brandGold/30"></span>
+                      <span class="font-title text-base font-black tracking-wider text-white">VIDEX<span class="text-brandGold">APP</span></span>
+                      <span class="text-[8px] bg-white/10 text-white/60 px-1 py-0.5 rounded font-mono">v2.0.0</span>
+                    </div>
+                    <p class="text-[10px] text-white/40 font-semibold leading-relaxed">
+                      Plataforma de streaming VIDEX
+                    </p>
+                    <a href="https://videx.lol" target="_blank" class="block text-[9px] text-[#7c3aed] hover:underline font-bold">
+                      https://videx.lol
+                    </a>
+                  </div>
+
+                </div>
+
+              </div>
+            </div>
           )}
 
           {/* Fixed bottom navigation tabs bar */}
@@ -1023,7 +1269,7 @@
     }
 
     // Component: Core Custom HTML5 Media & HLS player container
-    function VideoPlayer({ stream, triggerToast, onClosing, onRecordingAdded }) {
+    function VideoPlayer({ stream, triggerToast, onClosing, onRecordingAdded, config }) {
       const videoRef = useRef(null);
       const playerContainerRef = useRef(null);
       
@@ -1037,22 +1283,54 @@
       const [qualities, setQualities] = useState([]);
       const [selectedQuality, setSelectedQuality] = useState(-1);
       const [isQualityOpen, setIsQualityOpen] = useState(false);
-
+ 
       const [playbackError, setPlaybackError] = useState(null);
       const [isConnecting, setIsConnecting] = useState(true);
       const [reportModalOpen, setReportModalOpen] = useState(false);
 
+      // Report Problem States and handlers conforming to Correction 3
+      const [reportProblem, setReportProblem] = useState('Sin imagen');
+      const [reportDesc, setReportDesc] = useState('');
+      const [isSendingReport, setIsSendingReport] = useState(false);
+
+      const handleSubmitReport = async () => {
+        setIsSendingReport(true);
+        try {
+          const problemText = reportProblem;
+          const queryParams = new URLSearchParams({
+            canal: stream.title,
+            problema: reportDesc ? `${problemText} - ${reportDesc}` : problemText,
+            usuario: 'Anónimo'
+          });
+          const res = await fetch(`https://apio.videx.lol/reporte.php?${queryParams.toString()}`);
+          if (!res.ok) throw new Error();
+          
+          const data = await res.json();
+          if (data && data.duplicado) {
+            triggerToast('⚠️ Ya reportaste este problema recientemente');
+          } else {
+            triggerToast('✅ Reporte enviado. ¡Gracias!');
+          }
+          setReportModalOpen(false);
+          setReportDesc('');
+        } catch (e) {
+          triggerToast('❌ Error al enviar el reporte');
+        } finally {
+          setIsSendingReport(false);
+        }
+      };
+ 
       // Recording logic parameters
       const [isRecording, setIsRecording] = useState(false);
       const [recordingSeconds, setRecordingSeconds] = useState(0);
       const mediaRecorderRef = useRef(null);
       const recordedChunksRef = useRef([]);
       const recordingTimerRef = useRef(null);
-
+ 
       const hlsRef = useRef(null);
       const retryAttemptsRef = useRef(0);
       const maxRetryAttempts = 3;
-
+ 
       // Sintonizador de señal - Cascading Fallback (Safari direct m3u8 VS Hls.js VS Error handler)
       const initPlayer = () => {
         setIsConnecting(true);
@@ -1060,18 +1338,18 @@
         setQualities([]);
         setSelectedQuality(-1);
         setIsQualityOpen(false);
-
+ 
         const video = videoRef.current;
         if (!video) return;
-
+ 
         // Reset any previous hls instance
         if (hlsRef.current) {
           hlsRef.current.destroy();
           hlsRef.current = null;
         }
-
+ 
         const sourceUrl = stream.stream_url;
-
+ 
         // Fallback Cascading 1: Native iOS Safari browser support
         if (video.canPlayType('application/vnd.apple.mpegurl')) {
           video.src = sourceUrl;
@@ -1088,29 +1366,43 @@
               xhr.withCredentials = false;
             }
           });
-
+ 
           hlsRef.current = hls;
           hls.loadSource(sourceUrl);
           hls.attachMedia(video);
-
-          // Handle level selections (quality selector) ONLY if multiple are declared inside index file
+ 
+          // Handle level selections (quality selector)
           hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
             setIsConnecting(false);
             if (data.levels && data.levels.length > 1) {
               setQualities(data.levels);
-              setSelectedQuality(hls.currentLevel);
+              
+              // Apply preferred quality level (Alta, Media, Baja)
+              const levels = data.levels;
+              let finalLevel = -1; // Default Auto
+              if (config && config.calidadPreferida === 'Alta') {
+                finalLevel = levels.length - 1;
+              } else if (config && config.calidadPreferida === 'Baja') {
+                finalLevel = 0;
+              } else if (config && config.calidadPreferida === 'Media') {
+                finalLevel = Math.floor(levels.length / 2);
+              }
+              
+              hls.currentLevel = finalLevel;
+              setSelectedQuality(finalLevel);
             }
           });
-
+ 
           hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
             setSelectedQuality(data.level);
           });
-
+ 
           // Fallback Cascading 3: Error management & recoverMediaError routine
           hls.on(Hls.Events.ERROR, (event, data) => {
             if (data.fatal) {
               console.warn('Fatal HLS content load error detected:', data.type);
-              if (retryAttemptsRef.current < maxRetryAttempts) {
+              const shouldReconnect = config ? config.reconexionAutomatica : true;
+              if (shouldReconnect && retryAttemptsRef.current < maxRetryAttempts) {
                 retryAttemptsRef.current++;
                 console.log(`Auto recover attempt ${retryAttemptsRef.current}...`);
                 
@@ -1285,15 +1577,27 @@
         setIsQualityOpen(false);
       };
 
-      // Native WebApp share integration
+      // Native WebApp share integration conforming to Correction 2
       const handleShare = () => {
-        const descText = `Mira ${stream.title} en vivo en Videx App gratis! 🔗 ${stream.stream_url}`;
+        const shareTitle = 'VIDEX — Streaming';
+        const shareText = `Mira de forma gratuita ${stream.title} en VIDEX`;
+        const shareUrl = 'https://videx.lol';
+        const msgToSend = `${shareTitle}\n${shareText}\n${shareUrl}`;
+
         if (window.AndroidInterface && window.AndroidInterface.shareContent) {
-          window.AndroidInterface.shareContent(descText);
+          window.AndroidInterface.shareContent(msgToSend);
+        } else if (navigator.share) {
+          navigator.share({
+            title: shareTitle,
+            text: shareText,
+            url: shareUrl
+          }).catch(() => {
+            // Do nothing
+          });
         } else {
-          // Standard browser copy link fallback
-          navigator.clipboard.writeText(descText).then(() => {
-            triggerToast('Enlace descriptivo copiado al portapapeles!');
+          // Standard browser copy link fallback as defined in user specs
+          navigator.clipboard.writeText(shareUrl).then(() => {
+            triggerToast('🔗 Enlace copiado: videx.lol');
           }).catch(() => {
             triggerToast('Error al copiar el enlace.');
           });
@@ -1315,31 +1619,37 @@
         return `${hrs}:${mins}:${secs}`;
       };
 
-      // Capturing recorder logic conforming to Correction #4
+      // Recording seconds reference to solve closure stale state bugs
+      const recordingSecondsRef = useRef(0);
+
+      // Capturing recorder logic conforming to Correction #1
       const startRecording = () => {
-        const video = videoRef.current;
-        if (!video) return;
+        const videoEl = videoRef.current;
+        if (!videoEl) return;
 
         try {
           recordedChunksRef.current = [];
+          recordingSecondsRef.current = 0;
+          setRecordingSeconds(0);
           
-          let streamObj;
-          if (video.captureStream) {
-            streamObj = video.captureStream();
-          } else if (video.mozCaptureStream) {
-            streamObj = video.mozCaptureStream();
-          } else {
-            triggerToast('Tu navegador no soporta captura y grabación del reproductor.');
+          const streamObj = videoEl.captureStream
+            ? videoEl.captureStream()
+            : videoEl.mozCaptureStream
+            ? videoEl.mozCaptureStream()
+            : null;
+
+          if (!streamObj) {
+            triggerToast('Tu navegador no soporta grabación');
             return;
           }
 
-          const options = { mimeType: 'video/webm;codecs=vp8,opus' };
-          let recorder;
-          try {
-            recorder = new MediaRecorder(streamObj, options);
-          } catch (e) {
-            recorder = new MediaRecorder(streamObj);
-          }
+          const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+            ? 'video/webm;codecs=vp9'
+            : MediaRecorder.isTypeSupported('video/webm')
+            ? 'video/webm'
+            : '';
+
+          const recorder = new MediaRecorder(streamObj, mimeType ? { mimeType } : {});
 
           mediaRecorderRef.current = recorder;
 
@@ -1350,10 +1660,10 @@
           };
 
           recorder.onstop = () => {
-            const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+            const blob = new Blob(recordedChunksRef.current, { type: mimeType || 'video/webm' });
             const fileName = `videx_rec_${Date.now()}.webm`;
-            const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
-            const durFormatted = formatCounter(recordingSeconds);
+            const nowStr = new Date().toLocaleString();
+            const durFormatted = formatCounter(recordingSecondsRef.current);
 
             // Convert to base64 to leverage native bridge or fallback matching
             const reader = new FileReader();
@@ -1373,8 +1683,8 @@
                 triggerToast('Grabación descargada en el dispositivo.');
               }
 
-              // Update localStorage catalog database listing conform to Correction #4
-              const currentList = JSON.parse(localStorage.getItem('videx_recordings') || '[]');
+              // Update localStorage catalog database listing conforming to Correction #1
+              const currentList = JSON.parse(localStorage.getItem('videx_grabaciones') || '[]');
               const blobUrlLocal = URL.createObjectURL(blob); // available temporary for this tab session only
               
               const newReg = {
@@ -1382,12 +1692,12 @@
                 titulo: stream.title,
                 fecha: nowStr,
                 duracion: durFormatted,
-                nombreArchivo: fileName,
+                archivo: fileName,
                 blobUrl: blobUrlLocal
               };
 
               currentList.unshift(newReg);
-              localStorage.setItem('videx_recordings', JSON.stringify(currentList));
+              localStorage.setItem('videx_grabaciones', JSON.stringify(currentList));
               
               // Callback update
               if (onRecordingAdded) onRecordingAdded();
@@ -1396,7 +1706,6 @@
 
           recorder.start(1000); // chunk slices
           setIsRecording(true);
-          setRecordingSeconds(0);
           
           startRecordingTimer();
           triggerToast('Comenzó la grabación de la transmisión.');
@@ -1409,7 +1718,8 @@
       const startRecordingTimer = () => {
         stopRecordingTimer();
         recordingTimerRef.current = setInterval(() => {
-          setRecordingSeconds(prev => prev + 1);
+          recordingSecondsRef.current += 1;
+          setRecordingSeconds(recordingSecondsRef.current);
         }, 1000);
       };
 
@@ -1661,39 +1971,61 @@
             <button 
               onClick={onClosing}
               class="flex items-center space-x-1.5 bg-brandBg border border-white/5 hover:bg-white/5 transition text-[10px] font-black px-3.5 py-2 rounded-xl text-white uppercase tracking-wider"
-            >
-              <span>✕</span>
-              <span>Cerrar</span>
-            </button>
-          </div>
-
-          {/* Modal popup: Report content */}
           {reportModalOpen && (
-            <div class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-              <div class="bg-brandSurface border border-white/10 rounded-2xl p-5 w-full max-w-sm relative select-none">
-                <h4 class="text-xs font-black uppercase tracking-widest text-brandGold mb-3">⚠️ Reportar Falla de Transmisión</h4>
+            <div class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in text-white">
+              <div class="bg-brandSurface border border-white/10 rounded-2xl p-5 w-full max-w-sm relative flex flex-col select-none">
+                <h4 class="text-xs font-black uppercase tracking-widest text-brandGold mb-4 flex items-center space-x-1.5 border-b border-white/5 pb-2">
+                  <span>⚠️</span>
+                  <span>Reportar Falla de Transmisión</span>
+                </h4>
                 
-                <div class="space-y-2 mb-4">
-                  {["Sin imagen", "Sin sonido", "Buffering excesivo", "Stream caído"].map((opt) => (
-                    <button 
-                      key={opt}
-                      onClick={() => {
-                        setReportModalOpen(false);
-                        triggerToast(`Reporte enviado: "${opt}". Nuestro equipo está revisando la señal.`);
-                      }}
-                      class="w-full text-left bg-white/5 hover:bg-brandPurple/25 border border-white/5 hover:border-brandPurple/40 rounded-xl px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-white/95 transition"
-                    >
-                      {opt}
-                    </button>
-                  ))}
+                {/* Problema Selector */}
+                <div class="mb-4">
+                  <label class="block text-[10px] font-extrabold uppercase tracking-widest text-[#7c3aed] mb-1.5">Problema</label>
+                  <select 
+                    value={reportProblem} 
+                    onChange={(e) => setReportProblem(e.target.value)}
+                    class="w-full bg-[#0a0a0f] text-xs text-white/95 border border-white/10 rounded-xl px-3.5 py-2.5 focus:border-[#7c3aed] focus:outline-none transition font-semibold"
+                  >
+                    {["Sin imagen", "Sin sonido", "Buffering excesivo", "Stream caído", "Otro"].map((opt) => (
+                      <option key={opt} value={opt} class="bg-brandSurface text-xs">{opt}</option>
+                    ))}
+                  </select>
                 </div>
 
-                <button 
-                  onClick={() => setReportModalOpen(false)}
-                  class="w-full bg-[#181824] hover:bg-white/5 transition border border-white/5 text-white/55 font-bold uppercase text-[9px] tracking-widest py-2 rounded-xl"
-                >
-                  CANCELAR
-                </button>
+                {/* Descripción adicional Textarea */}
+                <div class="mb-5">
+                  <label class="block text-[10px] font-extrabold uppercase tracking-widest text-[#7c3aed] mb-1.5">Descripción adicional (Opcional)</label>
+                  <textarea 
+                    value={reportDesc}
+                    onChange={(e) => setReportDesc(e.target.value)}
+                    rows="3"
+                    placeholder="Escribe detalles sobre la falla..."
+                    class="w-full bg-[#0a0a0f] text-xs text-white border border-white/10 rounded-xl p-3 focus:border-[#7c3aed] focus:outline-none transition leading-relaxed"
+                  ></textarea>
+                </div>
+
+                {/* Submitting vs Cancel footer */}
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                  <button 
+                    onClick={() => setReportModalOpen(false)}
+                    disabled={isSendingReport}
+                    class="bg-[#1c1c2b] hover:bg-white/5 disabled:opacity-50 transition border border-white/5 text-white/50 hover:text-white font-extrabold uppercase text-[9px] tracking-widest py-2.5 rounded-xl text-center"
+                  >
+                    CANCELAR
+                  </button>
+                  <button 
+                    onClick={handleSubmitReport}
+                    disabled={isSendingReport}
+                    class="bg-brandGold hover:bg-brandGold/90 disabled:opacity-50 transition text-black font-extrabold uppercase text-[9px] tracking-widest py-2.5 rounded-xl text-center shadow-lg shadow-brandGold/20 flex items-center justify-center space-x-1"
+                  >
+                    {isSendingReport ? (
+                      <span>ENVIANDO...</span>
+                    ) : (
+                      <span>ENVIAR REPORTE</span>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}
