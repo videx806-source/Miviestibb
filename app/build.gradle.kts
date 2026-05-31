@@ -8,11 +8,11 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.aistudio.videxplayer.qzmvxt"
+        applicationId = "com.videx.lol"
         minSdk = 24
         targetSdk = 34
         versionCode = 2
-        versionName = "2.0.0"
+        versionName = "2.3.2"
 
         vectorDrawables {
             useSupportLibrary = true

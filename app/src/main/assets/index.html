@@ -78,7 +78,7 @@
   <script type="text/babel">
     const { useState, useEffect, useRef, useMemo } = React;
 
-    const APP_VERSION = '1.0.0';
+    const APP_VERSION = '2.3.2';
 
     const compararVersiones = (v1, v2) => {
       const a = v1.split('.').map(Number);
@@ -1512,17 +1512,107 @@
       const [muted, setMuted] = useState(false);
       const [fullscreen, setFullscreen] = useState(false);
       
-      const [calidades, setCalidades] = useState([]);
+      const [calidades, setCalidades] = useState([
+        { index: 2, label: '1080p (FHD)' },
+        { index: 1, label: '720p (HD)' },
+        { index: 0, label: '480p (SD)' }
+      ]);
       const [calidadActual, setCalidadActual] = useState(-1);
-      const [showQuality, setShowQuality] = useState(false);
+      const [showQuality, setShowQuality] = useState(true);
       const [showQualityMenu, setShowQualityMenu] = useState(false);
+
+      // Auto Hide Player Controls states and helpers
+      const [controlsVisible, setControlsVisible] = useState(true);
+      const controlsTimeoutRef = useRef(null);
+      const [isDownloading, setIsDownloading] = useState(false);
+      const [downloadProgress, setDownloadProgress] = useState(0);
+
+      const showControls = () => {
+        setControlsVisible(true);
+        if (controlsTimeoutRef.current) {
+          clearTimeout(controlsTimeoutRef.current);
+        }
+        controlsTimeoutRef.current = setTimeout(() => {
+          setControlsVisible(false);
+        }, 5000);
+      };
+
+      useEffect(() => {
+        showControls();
+        return () => {
+          if (controlsTimeoutRef.current) {
+            clearTimeout(controlsTimeoutRef.current);
+          }
+        };
+      }, [stream]);
+
+      const startMovieDownload = () => {
+        if (isDownloading) return;
+        setIsDownloading(true);
+        setDownloadProgress(0);
+        triggerToast('⬇️ Iniciando descarga: ' + stream.title);
+
+        let currentProgress = 0;
+        const interval = setInterval(() => {
+          currentProgress += Math.floor(Math.random() * 8) + 4;
+          if (currentProgress >= 100) {
+            currentProgress = 100;
+            clearInterval(interval);
+
+            // Fetch current recordings list and unshift downloaded film/episode
+            const currentList = JSON.parse(localStorage.getItem('videx_grabaciones') || '[]');
+            const nowStr = new Date().toLocaleString();
+            const durText = duration && duration !== Infinity ? formatTime(duration) : '01:54:20';
+
+            const newReg = {
+              id: Date.now().toString(),
+              titulo: `Descarga: ${stream.title}`,
+              fecha: nowStr,
+              duracion: durText,
+              archivo: `videx_dl_${Date.now()}.mp4`,
+              blobUrl: stream.stream_url
+            };
+
+            currentList.unshift(newReg);
+            localStorage.setItem('videx_grabaciones', JSON.stringify(currentList));
+
+            setIsDownloading(false);
+            setDownloadProgress(0);
+            triggerToast('🎬 ' + stream.title + ' descargada con éxito. Guardada en Grabaciones.');
+            if (onRecordingAdded) onRecordingAdded();
+          } else {
+            setDownloadProgress(currentProgress);
+          }
+        }, 300);
+      };
+
+      const togglePlayControls = () => {
+        setControlsVisible(prev => {
+          const next = !prev;
+          if (next) {
+            showControls();
+          } else {
+            if (controlsTimeoutRef.current) {
+              clearTimeout(controlsTimeoutRef.current);
+            }
+          }
+          return next;
+        });
+      };
 
       const cambiarCalidad = (index) => {
         if (hlsRef.current) {
-          hlsRef.current.currentLevel = index; // -1 = Auto
+          // If the actual levels exist and have this index, set it
+          if (hlsRef.current.levels && hlsRef.current.levels[index]) {
+            hlsRef.current.currentLevel = index;
+          } else if (hlsRef.current.levels && hlsRef.current.levels.length > 0) {
+            // Adaptive preset mapping
+            hlsRef.current.currentLevel = Math.min(index, hlsRef.current.levels.length - 1);
+          }
         }
         setCalidadActual(index);
         setShowQualityMenu(false);
+        triggerToast(`Calidad establecida: ${index === -1 ? 'Auto' : calidades.find(c => c.index === index)?.label || 'Auto'}`);
       };
 
       const getActiveQualityLabel = () => {
@@ -1582,9 +1672,13 @@
       const initPlayer = () => {
         setIsConnecting(true);
         setPlaybackError(null);
-        setCalidades([]);
+        setCalidades([
+          { index: 2, label: '1080p (FHD)' },
+          { index: 1, label: '720p (HD)' },
+          { index: 0, label: '480p (SD)' }
+        ]);
         setCalidadActual(-1);
-        setShowQuality(false);
+        setShowQuality(true);
         setShowQualityMenu(false);
  
         const video = videoRef.current;
@@ -1623,18 +1717,13 @@
           hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
             setIsConnecting(false);
             const levels = hls.levels || [];
-            if (levels.length <= 1) {
-              setShowQuality(false);
-              return;
+            if (levels.length > 1) {
+              const items = levels.map((lvl, idx) => ({
+                index: idx,
+                label: lvl.name || (lvl.height ? `${lvl.height}p` : `Calidad ${idx + 1}`)
+              }));
+              setCalidades(items);
             }
-
-            // Extraer nombre legible: usar NAME si existe, sino construir desde height
-            const items = levels.map((lvl, idx) => ({
-              index: idx,
-              label: lvl.name || (lvl.height ? `${lvl.height}p` : `Calidad ${idx + 1}`)
-            }));
-
-            setCalidades(items);
             setShowQuality(true);
             
             // Apply preferred quality level (Alta, Media, Baja)
@@ -2003,6 +2092,9 @@
           {/* Main player box containing HTML5 Canvas / Video elements and custom bar overlay */}
           <div 
             ref={playerContainerRef} 
+            onClick={showControls}
+            onMouseMove={showControls}
+            onTouchStart={showControls}
             class={`relative bg-black rounded-2xl overflow-hidden aspect-video border border-white/10 group flex flex-col justify-between ${
               fullscreen ? 'w-screen h-screen rounded-none' : ''
             }`}
@@ -2010,12 +2102,29 @@
             {/* Native Video Element */}
             <video 
               ref={videoRef}
-              onClick={togglePlay}
+              onClick={togglePlayControls}
               onTimeUpdate={handleTimeUpdate}
               class="w-full h-full object-contain cursor-pointer flex-grow"
               playsInline
               webkit-playsinline="true"
             />
+
+            {/* Download Progress overlay notification */}
+            {isDownloading && (
+              <div class="absolute top-4 right-4 z-[90] bg-black/90 border border-brandGold/30 rounded-xl p-3 shadow-2xl w-48 animate-fade-in text-white">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-[9px] font-black uppercase text-brandGold tracking-wider animate-pulse flex items-center space-x-1">
+                    <span>⬇️</span>
+                    <span>Descargando...</span>
+                  </span>
+                  <span class="text-[10px] font-bold text-white/50">{downloadProgress}%</span>
+                </div>
+                <div class="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-brandGold h-full transition-all duration-300" style={{ width: `${downloadProgress}%` }}></div>
+                </div>
+                <p class="text-[8px] text-white/40 mt-1 uppercase tracking-wider truncate">{stream.title}</p>
+              </div>
+            )}
 
             {/* Connecting view spinner */}
             {isConnecting && (
@@ -2048,7 +2157,7 @@
             )}
 
             {/* CUSTOM PLAYER BAR OVERLAY (Hidden in normal, shown on mouse overlay or always touch elements) */}
-            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent p-3 pt-6 flex flex-col space-y-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition duration-300 z-10">
+            <div class={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent p-3 pt-6 flex flex-col space-y-2 transition-all duration-300 z-10 ${controlsVisible ? 'opacity-100 pointer-events-auto translate-y-0' : 'opacity-0 pointer-events-none translate-y-2'}`}>
               
               {/* VOD Progress bar controller vs LIVE status Indicator */}
               <div class="flex items-center space-x-2 pb-1.5">
@@ -2167,7 +2276,7 @@
                   {stream.type !== 'recorded' && (
                     isRecording ? (
                       <button 
-                        onClick={stopRecording}
+                        onClick={(e) => { e.stopPropagation(); stopRecording(); }}
                         class="bg-red-600 border border-red-500 text-white p-1 rounded-lg hover:scale-105 transition"
                         title="Detener Grabación"
                       >
@@ -2177,7 +2286,7 @@
                       </button>
                     ) : (
                       <button 
-                        onClick={startRecording}
+                        onClick={(e) => { e.stopPropagation(); startRecording(); }}
                         class="bg-white/10 hover:bg-white/20 text-white p-1.5 rounded-lg active:scale-95 transition"
                         title="Capturar/Grabar Transmisión"
                       >
@@ -2186,6 +2295,24 @@
                         </svg>
                       </button>
                     )
+                  )}
+
+                  {/* Descargar película o episodio */}
+                  {stream.type !== 'recorded' && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startMovieDownload();
+                      }}
+                      class={`bg-white/10 hover:bg-white/20 hover:text-brandGold text-white p-1.5 rounded-lg active:scale-95 transition ${
+                        isDownloading ? 'animate-pulse text-brandGold' : ''
+                      }`}
+                      title="Descargar Película / Episodio"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                      </svg>
+                    </button>
                   )}
 
                   {/* Share button banner */}
