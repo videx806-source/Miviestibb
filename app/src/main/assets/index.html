@@ -78,6 +78,24 @@
   <script type="text/babel">
     const { useState, useEffect, useRef, useMemo } = React;
 
+    const APP_VERSION = '1.0.0';
+
+    const compararVersiones = (v1, v2) => {
+      const a = v1.split('.').map(Number);
+      const b = v2.split('.').map(Number);
+      for (let i = 0; i < 3; i++) {
+        if ((a[i]||0) < (b[i]||0)) return -1;
+        if ((a[i]||0) > (b[i]||0)) return  1;
+      }
+      return 0;
+    };
+
+    const buildStreamUrl = (detailUrl) => {
+      // detailUrl ej: https://h5.swplayer.com/es/detail/drama/8vrya202T5yf43IzsANbG-Head-over-Heels/3
+      const path = detailUrl.replace('https://h5.swplayer.com', '');
+      return `https://apio.videx.lol${path}.m3u8`;
+    };
+
     // A clean Custom Toast notification system
     function Toast({ message, onClose }) {
       useEffect(() => {
@@ -195,6 +213,14 @@
 
       const [configModalOpen, setConfigModalOpen] = useState(false);
 
+      // Updates and Messages States
+      const [updateType, setUpdateType] = useState(null); // 'none', 'optional', 'mandatory'
+      const [updateInfo, setUpdateInfo] = useState(null);  // holds updates json object
+      const [bannerVisible, setBannerVisible] = useState(true);
+
+      const [mensajeSistema, setMensajeSistema] = useState('');
+      const [showMensaje, setShowMensaje] = useState(false);
+
       useEffect(() => {
         try {
           localStorage.setItem('videx_config', JSON.stringify(config));
@@ -294,6 +320,28 @@
         }
       };
 
+      const compartirGrabacion = async (grabacion) => {
+        const texto = `🎬 Grabé "${grabacion.titulo}" en VIDEX\n⏱ Duración: ${grabacion.duracion}\n📲 Descarga la app: https://videx.lol`;
+
+        // Intentar Web Share API (funciona en móvil con Android/iOS)
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: `VIDEX — ${grabacion.titulo}`,
+              text: texto,
+              url: 'https://videx.lol'
+            });
+            return;
+          } catch (err) {
+            console.log("Web share error or user cancel, fallback to WhatsApp", err);
+          }
+        }
+
+        // Fallback: WhatsApp directo
+        const waUrl = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+        window.open(waUrl, '_blank');
+      };
+
       useEffect(() => {
         loadRecordings();
       }, []);
@@ -362,8 +410,64 @@
       };
 
       useEffect(() => {
-        fetchEvents();
-        fetchChannels();
+        const initAppFlow = async () => {
+          let hasBlockingUpdate = false;
+          
+          // Step 1: Check Updates First
+          try {
+            const res = await fetch('https://apio.videx.lol/actualizaciones.json');
+            if (res.ok) {
+              const data = await res.json();
+              const upd = data.actualizacion;
+              if (upd) {
+                setUpdateInfo(upd);
+                
+                // Compare with version_minima_requerida to check if current is less
+                const isDesactualizadoMandatory = compararVersiones(APP_VERSION, upd.version_minima_requerida) < 0;
+                
+                if (upd.requiere_actualizacion_obligatoria === true && isDesactualizadoMandatory) {
+                  setUpdateType('mandatory');
+                  hasBlockingUpdate = true; // Halt execution of anything else
+                } else {
+                  // Check if there is a newer release at all
+                  const hasNewerVersion = compararVersiones(APP_VERSION, upd.version) < 0;
+                  if (hasNewerVersion) {
+                    setUpdateType('optional');
+                  } else {
+                    setUpdateType('none');
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.error("Error checking updates", e);
+          }
+
+          // If there is a blocking update, stop further execution completely!
+          if (hasBlockingUpdate) {
+            return;
+          }
+
+          // Step 2: Check System Message (SMS) Second
+          try {
+            const res = await fetch('https://apio.videx.lol/sms.json');
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.Mostrar === true && data.mensaje) {
+                setMensajeSistema(data.mensaje);
+                setShowMensaje(true);
+              }
+            }
+          } catch (e) {
+            console.error("Error checking system messages", e);
+          }
+
+          // Step 3: Load app normally
+          fetchEvents();
+          fetchChannels();
+        };
+
+        initAppFlow();
       }, []);
 
       const categories = useMemo(() => {
@@ -435,6 +539,32 @@
       return (
         <div class={`flex flex-col min-h-screen ${config.modoOscuroPuro ? 'bg-black' : 'bg-[#0a0a0f]'} text-white`}>
           
+          {/* Optional update dismissible banner conform to Addition 1 */}
+          {updateType === 'optional' && bannerVisible && updateInfo && (
+            <div class="bg-gradient-to-r from-brandPurple to-[#5e1ae6] text-white py-2 px-4 flex items-center justify-between text-xs font-semibold shadow-inner border-b border-brandPurple/30 sticky top-0 z-45">
+              <div class="flex items-center space-x-2">
+                <span class="animate-pulse">⬆️</span>
+                <span>Nueva versión disponible (v{updateInfo.version})</span>
+              </div>
+              <div class="flex items-center space-x-3">
+                <a 
+                  href={updateInfo?.urls_descarga?.apk_directo || updateInfo?.apk_directo || 'https://videx.lol'}
+                  target="_blank"
+                  class="bg-brandGold text-black font-black text-[10px] px-3 py-1 rounded-md uppercase tracking-wider hover:bg-brandGold/90 transition shadow-md"
+                >
+                  Descargar
+                </a>
+                <button 
+                  onClick={() => setBannerVisible(false)}
+                  class="text-white/60 hover:text-white font-bold p-1 leading-none text-sm active:scale-90 transition"
+                  title="Cerrar aviso"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Header Branding */}
           <header class="bg-[#12121a]/95 border-b border-white/5 py-3.5 px-5 flex justify-between items-center sticky top-0 z-30 backdrop-blur-md">
             <div class="flex items-center space-x-2">
@@ -839,7 +969,7 @@
                         {selectedMovie.episodes && selectedMovie.episodes.length === 1 && (
                           <button 
                             onClick={() => {
-                              const finalUrl = `https://ultraflixplayer.vercel.app/stream.m3u8?url=${encodeURIComponent(selectedMovie.episodes[0].url)}`;
+                              const finalUrl = buildStreamUrl(selectedMovie.episodes[0].url);
                               playContent({
                                 id: selectedMovie.episodes[0].url,
                                 title: selectedMovie.title,
@@ -868,7 +998,7 @@
                                 <button
                                   key={ep.episode}
                                   onClick={() => {
-                                    const finalUrl = `https://ultraflixplayer.vercel.app/stream.m3u8?url=${encodeURIComponent(ep.url)}`;
+                                    const finalUrl = buildStreamUrl(ep.url);
                                     playContent({
                                       id: ep.url,
                                       title: `${selectedMovie.title} - ${ep.label || `Ep. ${ep.episode}`}`,
@@ -996,6 +1126,16 @@
                             </button>
                           )}
 
+                          {/* Share button conform to Correction 3 */}
+                          <button
+                            onClick={() => compartirGrabacion(rec)}
+                            class="bg-white/10 hover:bg-white/20 hover:text-brandGold text-white px-3 py-2 rounded-xl text-xs font-bold leading-none tracking-wider flex items-center space-x-1 transition active:scale-95"
+                            title="Compartir Grabación"
+                          >
+                            <span>↗</span>
+                            <span>COMPARTIR</span>
+                          </button>
+
                           {/* Trash button */}
                           <button
                             onClick={() => {
@@ -1042,6 +1182,98 @@
             )}
 
           </main>
+
+          {/* Mandatory blocking update screen - Addition 1 Case 1 */}
+          {updateType === 'mandatory' && updateInfo && (
+            <div class="fixed inset-0 z-[9999] bg-[#030305]/95 backdrop-blur-md flex items-center justify-center p-6 select-none animate-fade-in text-white">
+              <div class="bg-gradient-to-br from-brandSurface to-[#161622] border border-brandGold/30 rounded-2xl p-6 w-full max-w-sm text-center shadow-2xl relative">
+                {/* Gold glow decoration */}
+                <div class="absolute -top-10 -left-10 w-24 h-24 bg-brandGold/10 rounded-full blur-2xl"></div>
+                <div class="absolute -bottom-10 -right-10 w-24 h-24 bg-brandPurple/10 rounded-full blur-2xl"></div>
+
+                <div class="flex flex-col items-center">
+                  {/* VIDEX logo branding */}
+                  <div class="flex items-center space-x-2 mb-6">
+                    <span class="w-3 h-7 bg-brandGold rounded-full shadow-lg shadow-brandGold/30"></span>
+                    <h1 class="text-3xl font-black font-title tracking-widest">
+                      VIDEX<span class="text-brandGold">APP</span>
+                    </h1>
+                  </div>
+
+                  {/* Icon */}
+                  <div class="w-14 h-14 bg-brandGold/10 rounded-full flex items-center justify-center border border-brandGold/20 mb-4 animate-bounce">
+                    <span class="text-2xl text-brandGold">⬆️</span>
+                  </div>
+
+                  <h3 class="text-lg font-black uppercase tracking-wider text-brandGold mb-2">
+                    {updateInfo.titulo || 'Actualización Obligatoria'}
+                  </h3>
+
+                  <p class="text-xs text-white/70 leading-relaxed mb-4">
+                    {updateInfo.descripcion || 'Se requiere una versión actualizada para continuar disfrutando del servicio.'}
+                  </p>
+
+                  {/* Cambios list */}
+                  {updateInfo.cambios && updateInfo.cambios.length > 0 && (
+                    <div class="w-full text-left bg-black/40 border border-white/5 rounded-xl p-3 mb-5 max-h-32 overflow-y-auto">
+                      <span class="block text-[9px] font-black uppercase tracking-widest text-brandPurple mb-1.5">CAMBIOS RECIENTES:</span>
+                      <ul class="space-y-1">
+                        {updateInfo.cambios.map((cambio, idx) => (
+                          <li key={idx} class="text-[10px] text-white/60 flex items-start space-x-1.5 font-semibold">
+                            <span class="text-brandGold">•</span>
+                            <span>{cambio}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Version indicator */}
+                  <div class="text-[10px] font-bold text-white/40 mb-5 uppercase tracking-wide bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                    Versión actual: <span class="text-white/60">{APP_VERSION}</span> ➔ Nueva: <span class="text-brandGold">{updateInfo.version}</span>
+                  </div>
+
+                  {/* Download button */}
+                  <a 
+                    href={updateInfo?.urls_descarga?.apk_directo || updateInfo?.apk_directo || 'https://videx.lol'}
+                    target="_blank"
+                    class="w-full bg-brandGold hover:bg-brandGold/90 transition text-black font-black uppercase text-xs tracking-wider py-3 rounded-xl shadow-lg shadow-brandGold/25 flex items-center justify-center space-x-1.5 active:scale-95 duration-100"
+                  >
+                    <span>⬇</span>
+                    <span>Descargar APK</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* System Announcement Modal (SMS.json) - Addition 2 */}
+          {showMensaje && mensajeSistema && (
+            <div class="fixed inset-0 z-[9900] bg-black/80 backdrop-blur-sm flex items-center justify-center p-5 select-none animate-fade-in text-white">
+              <div class="bg-brandSurface border border-white/10 rounded-2xl p-6 w-full max-w-xs text-center shadow-2xl relative">
+                
+                {/* Purple decorative pulse icon */}
+                <div class="w-12 h-12 bg-brandPurple/10 border border-brandPurple/20 text-brandPurple rounded-full flex items-center justify-center mx-auto mb-4 text-xl">
+                  📢
+                </div>
+
+                <h3 class="text-sm font-black uppercase tracking-widest text-brandGold mb-3">
+                  Aviso de VIDEX
+                </h3>
+
+                <p class="text-xs text-white/85 leading-relaxed font-semibold mb-6 select-text max-h-48 overflow-y-auto">
+                  {mensajeSistema}
+                </p>
+
+                <button 
+                  onClick={() => setShowMensaje(false)}
+                  class="w-full bg-brandPurple hover:bg-brandPurple/90 transition text-white font-extrabold uppercase text-[10px] tracking-widest py-3 rounded-xl shadow-lg border border-brandPurple/30 active:scale-95 duration-100"
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Fallback internal Toast overlays */}
           {toastMsg && (
@@ -1280,9 +1512,24 @@
       const [muted, setMuted] = useState(false);
       const [fullscreen, setFullscreen] = useState(false);
       
-      const [qualities, setQualities] = useState([]);
-      const [selectedQuality, setSelectedQuality] = useState(-1);
-      const [isQualityOpen, setIsQualityOpen] = useState(false);
+      const [calidades, setCalidades] = useState([]);
+      const [calidadActual, setCalidadActual] = useState(-1);
+      const [showQuality, setShowQuality] = useState(false);
+      const [showQualityMenu, setShowQualityMenu] = useState(false);
+
+      const cambiarCalidad = (index) => {
+        if (hlsRef.current) {
+          hlsRef.current.currentLevel = index; // -1 = Auto
+        }
+        setCalidadActual(index);
+        setShowQualityMenu(false);
+      };
+
+      const getActiveQualityLabel = () => {
+        if (calidadActual === -1) return 'Auto';
+        const match = calidades.find(c => c.index === calidadActual);
+        return match ? match.label : 'Auto';
+      };
  
       const [playbackError, setPlaybackError] = useState(null);
       const [isConnecting, setIsConnecting] = useState(true);
@@ -1335,9 +1582,10 @@
       const initPlayer = () => {
         setIsConnecting(true);
         setPlaybackError(null);
-        setQualities([]);
-        setSelectedQuality(-1);
-        setIsQualityOpen(false);
+        setCalidades([]);
+        setCalidadActual(-1);
+        setShowQuality(false);
+        setShowQualityMenu(false);
  
         const video = videoRef.current;
         if (!video) return;
@@ -1374,27 +1622,37 @@
           // Handle level selections (quality selector)
           hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
             setIsConnecting(false);
-            if (data.levels && data.levels.length > 1) {
-              setQualities(data.levels);
-              
-              // Apply preferred quality level (Alta, Media, Baja)
-              const levels = data.levels;
-              let finalLevel = -1; // Default Auto
-              if (config && config.calidadPreferida === 'Alta') {
-                finalLevel = levels.length - 1;
-              } else if (config && config.calidadPreferida === 'Baja') {
-                finalLevel = 0;
-              } else if (config && config.calidadPreferida === 'Media') {
-                finalLevel = Math.floor(levels.length / 2);
-              }
-              
-              hls.currentLevel = finalLevel;
-              setSelectedQuality(finalLevel);
+            const levels = hls.levels || [];
+            if (levels.length <= 1) {
+              setShowQuality(false);
+              return;
             }
+
+            // Extraer nombre legible: usar NAME si existe, sino construir desde height
+            const items = levels.map((lvl, idx) => ({
+              index: idx,
+              label: lvl.name || (lvl.height ? `${lvl.height}p` : `Calidad ${idx + 1}`)
+            }));
+
+            setCalidades(items);
+            setShowQuality(true);
+            
+            // Apply preferred quality level (Alta, Media, Baja)
+            let finalLevel = -1; // Default Auto
+            if (config && config.calidadPreferida === 'Alta') {
+              finalLevel = levels.length - 1;
+            } else if (config && config.calidadPreferida === 'Baja') {
+              finalLevel = 0;
+            } else if (config && config.calidadPreferida === 'Media') {
+              finalLevel = Math.floor(levels.length / 2);
+            }
+            
+            hls.currentLevel = finalLevel;
+            setCalidadActual(finalLevel);
           });
- 
+
           hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
-            setSelectedQuality(data.level);
+            // Level switched can update if needed, but keeping user choice (-1 for Auto) preserved in state
           });
  
           // Fallback Cascading 3: Error management & recoverMediaError routine
@@ -1863,34 +2121,41 @@
                 <div class="flex items-center space-x-2.5">
                   
                   {/* Quality levels selector - ONLY if playlist contains multiple configurations conform to Rule #3 */}
-                  {qualities.length > 0 && (
+                  {/* Quality levels selector in Player Controls */}
+                  {showQuality && (
                     <div class="relative">
                       <button 
-                        onClick={() => setIsQualityOpen(!isQualityOpen)}
-                        class="text-[10px] font-bold bg-white/10 hover:bg-[#1a1a26] border border-white/10 px-2 py-1 rounded text-white active:scale-95 transition"
+                        onClick={() => setShowQualityMenu(!showQualityMenu)}
+                        class="text-[10px] font-bold bg-white/10 hover:bg-[#1a1a26] border border-white/10 px-2.5 py-1 rounded-lg text-white active:scale-95 transition flex items-center space-x-1"
                       >
-                        ⚙️ {selectedQuality === -1 ? 'AUTO' : `${qualities[selectedQuality].height}P`}
+                        <span>⚙️</span>
+                        <span>{getActiveQualityLabel()}</span>
                       </button>
 
-                      {isQualityOpen && (
-                        <div class="absolute bottom-full right-0 mb-2 bg-[#0c0c12] border border-white/10 rounded-xl p-1.5 shadow-2xl flex flex-col space-y-1 min-w-[100px] z-[99]">
+                      {showQualityMenu && (
+                        <div class="absolute bottom-full right-0 mb-2 bg-[#0c0c12]/95 border border-white/10 rounded-xl p-1.5 shadow-2xl flex flex-col space-y-1 min-w-[120px] z-[99]">
+                          {/* Option Auto (index -1) */}
                           <button 
-                            onClick={() => changeLevel(-1)}
-                            class={`text-left text-[9px] font-bold px-2 py-1 rounded transition uppercase ${
-                              selectedQuality === -1 ? 'text-brandGold bg-brandGold/10' : 'text-white/60 hover:bg-white/5'
+                            onClick={() => cambiarCalidad(-1)}
+                            class={`text-left text-[9px] font-bold px-2 py-1.5 rounded transition uppercase flex items-center justify-between ${
+                              calidadActual === -1 ? 'text-brandGold bg-brandGold/10' : 'text-white/60 hover:bg-white/5'
                             }`}
                           >
-                            AUTOMÁTICO
+                            <span>Auto</span>
+                            {calidadActual === -1 && <span class="text-brandGold font-bold text-xs ml-2">✓</span>}
                           </button>
-                          {qualities.map((item, idx) => (
+
+                          {/* Qualities map */}
+                          {calidades.map((item) => (
                             <button
-                              key={idx}
-                              onClick={() => changeLevel(idx)}
-                              class={`text-left text-[9px] font-bold px-2 py-1 rounded transition ${
-                                selectedQuality === idx ? 'text-brandGold bg-brandGold/10' : 'text-white/60 hover:bg-white/5'
+                              key={item.index}
+                              onClick={() => cambiarCalidad(item.index)}
+                              class={`text-left text-[9px] font-bold px-2 py-1.5 rounded transition flex items-center justify-between ${
+                                calidadActual === item.index ? 'text-brandGold bg-brandGold/10' : 'text-white/60 hover:bg-white/5'
                               }`}
                             >
-                              {item.height}P ({Math.round(item.bitrate / 1000)}kbps)
+                              <span>{item.label}</span>
+                              {calidadActual === item.index && <span class="text-brandGold font-bold text-xs ml-2">✓</span>}
                             </button>
                           ))}
                         </div>
