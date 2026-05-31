@@ -10,6 +10,8 @@ import android.os.Build
 import android.os.Environment
 import android.util.Base64
 import android.widget.Toast
+import android.widget.FrameLayout
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -35,18 +37,102 @@ import java.io.FileOutputStream
 import java.io.OutputStream
 
 class MainActivity : ComponentActivity() {
+    private var webViewInstance: WebView? = null
+    private var customView: View? = null
+    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
+    private lateinit var rootContainer: FrameLayout
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Set matching dark status bar and navigation bar system color colors
         try {
             window.statusBarColor = AndroidColor.parseColor("#0a0a0f")
             window.navigationBarColor = AndroidColor.parseColor("#0a0a0f")
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        // Root frame layout to allow overlaying custom video views
+        rootContainer = FrameLayout(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            setBackgroundColor(AndroidColor.parseColor("#0a0a0f"))
+        }
+
+        val webView = WebView(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            setBackgroundColor(AndroidColor.parseColor("#0a0a0f"))
+
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                databaseEnabled = true
+                useWideViewPort = true
+                loadWithOverviewMode = true
+                loadsImagesAutomatically = true
+                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                allowFileAccess = true
+                allowContentAccess = true
+                allowFileAccessFromFileURLs = true
+                allowUniversalAccessFromFileURLs = true
+                mediaPlaybackRequiresUserGesture = false
+            }
+
+            webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                    if (url != null && (url.startsWith("http://") || url.startsWith("https://"))) {
+                        view?.loadUrl(url)
+                        return true
+                    }
+                    return false
+                }
+            }
+
+            webChromeClient = object : WebChromeClient() {
+                override fun onPermissionRequest(request: PermissionRequest) {
+                    request.grant(request.resources)
+                }
+
+                override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                    super.onShowCustomView(view, callback)
+                    if (customView != null) {
+                        callback?.onCustomViewHidden()
+                        return
+                    }
+                    customView = view
+                    customViewCallback = callback
+                    
+                    webViewInstance?.visibility = View.GONE
+                    rootContainer.addView(view, FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    ))
+                }
+
+                override fun onHideCustomView() {
+                    super.onHideCustomView()
+                    if (customView == null) return
+                    
+                    rootContainer.removeView(customView)
+                    customView = null
+                    customViewCallback?.onCustomViewHidden()
+                    webViewInstance?.visibility = View.VISIBLE
+                }
+            }
+
+            addJavascriptInterface(WebAppInterface(context), "AndroidInterface")
+            loadUrl("file:///android_asset/index.html")
+        }
+
+        webViewInstance = webView
+        rootContainer.addView(webView)
 
         setContent {
             Box(
@@ -57,52 +143,24 @@ class MainActivity : ComponentActivity() {
                     .navigationBarsPadding()
             ) {
                 AndroidView(
-                    factory = { context ->
-                        WebView(context).apply {
-                            layoutParams = ViewGroup.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                            setBackgroundColor(AndroidColor.parseColor("#0a0a0f"))
-
-                            settings.apply {
-                                javaScriptEnabled = true
-                                domStorageEnabled = true
-                                databaseEnabled = true
-                                useWideViewPort = true
-                                loadWithOverviewMode = true
-                                loadsImagesAutomatically = true
-                                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                                allowFileAccess = true
-                                allowContentAccess = true
-                                allowFileAccessFromFileURLs = true
-                                allowUniversalAccessFromFileURLs = true
-                                mediaPlaybackRequiresUserGesture = false
-                            }
-
-                            webViewClient = object : WebViewClient() {
-                                override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-                                    if (url != null && (url.startsWith("http://") || url.startsWith("https://"))) {
-                                        view?.loadUrl(url)
-                                        return true
-                                    }
-                                    return false
-                                }
-                            }
-
-                            webChromeClient = object : WebChromeClient() {
-                                override fun onPermissionRequest(request: PermissionRequest) {
-                                    request.grant(request.resources)
-                                }
-                            }
-
-                            addJavascriptInterface(WebAppInterface(context), "AndroidInterface")
-                            loadUrl("file:///android_asset/index.html")
-                        }
-                    },
+                    factory = { rootContainer },
                     modifier = Modifier.fillMaxSize()
                 )
             }
+        }
+    }
+
+    @SuppressLint("MissingSuperCall")
+    override fun onBackPressed() {
+        if (customView != null) {
+            webViewInstance?.webChromeClient?.onHideCustomView()
+            return
+        }
+        val webView = webViewInstance
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack()
+        } else {
+            finish()
         }
     }
 }

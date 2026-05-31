@@ -5,24 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>VIDEX APP</title>
 
-  <!-- Google Fonts: Bebas Neue for headings, Barlow for body text -->
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;600;700&display=swap" rel="stylesheet">
 
-  <!-- Tailwind Play CDN -->
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- React CDNs -->
+  <!-- React & Babel -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- hls.js for HLS streaming support -->
+  <!-- hls.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.10/hls.min.js"></script>
 
   <style>
-    /* Premium Application Shell Theme Adjustments */
     body {
       background-color: #0a0a0f;
       color: #ffffff;
@@ -35,7 +34,6 @@
       font-family: 'Bebas Neue', sans-serif;
       letter-spacing: 0.05em;
     }
-    /* Hide scrollbars elegantly */
     ::-webkit-scrollbar {
       width: 4px;
       height: 4px;
@@ -44,24 +42,22 @@
       background: #0a0a0f;
     }
     ::-webkit-scrollbar-thumb {
-      background: #3b3b4f;
+      background: #1f1f2e;
       border-radius: 2px;
     }
     ::-webkit-scrollbar-thumb:hover {
       background: #f5c518;
     }
-    /* Custom animation for pulsating red live dot */
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(1.1); }
+      50% { opacity: 0.4; transform: scale(1.08); }
     }
-    .custom-pulse {
+    .live-pulse {
       animation: pulse 1.2s infinite ease-in-out;
     }
   </style>
 
   <script>
-    // Tailwind Custom Configuration Setup
     tailwind.config = {
       theme: {
         extend: {
@@ -79,11 +75,10 @@
 <body class="bg-[#0a0a0f]">
   <div id="root"></div>
 
-  <!-- React JSX Application Code -->
   <script type="text/babel">
     const { useState, useEffect, useRef, useMemo } = React;
 
-    // Toast Notification Component
+    // A clean Custom Toast notification system
     function Toast({ message, onClose }) {
       useEffect(() => {
         const timer = setTimeout(onClose, 3000);
@@ -91,39 +86,114 @@
       }, [onClose]);
 
       return (
-        <div class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-brandPurple/95 border border-white/20 text-white font-semibold py-3 px-6 rounded-full shadow-2xl backdrop-blur-md text-sm z-50 flex items-center space-x-2 animate-bounce">
+        <div class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-brandPurple/95 border border-white/10 text-white font-semibold py-3 px-6 rounded-full shadow-2xl backdrop-blur-md text-sm z-50 flex items-center space-x-2 animate-bounce">
           <span>{message}</span>
         </div>
       );
     }
 
-    // Main App Container
+    // Component: TV Channel custom branding placeholder
+    function PlaceholderCanal({ nombre }) {
+      return (
+        <div class="w-full h-full flex flex-col items-center justify-center bg-[#1e1e2e] rounded-xl p-2 text-center">
+          <svg class="w-10 h-10 text-brandGold mb-2" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 20.25h12m-7.5-3v3m3-3v3m-10.125-3h14.25c.621 0 1.125-.504 1.125-1.125V4.875c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125z" />
+          </svg>
+          <span class="text-xs font-bold text-white uppercase tracking-wider truncate w-full px-1">{nombre}</span>
+        </div>
+      );
+    }
+
+    // Channel Thumbnail with robust image loading onError recovery
+    function ChannelIcon({ canal, onClick }) {
+      const [imgError, setImgError] = useState(false);
+      const isPremium = canal.es_premium === true;
+      const isActive = canal.activo !== false;
+      const logoSrc = !imgError && (canal.img || canal.logo_url);
+
+      return (
+        <div 
+          onClick={onClick}
+          class={`relative bg-brandSurface/80 hover:bg-[#181824] rounded-xl p-3 flex flex-col items-center justify-between min-h-[142px] border cursor-pointer hover:border-brandPurple hover:scale-[1.04] transition-all duration-200 ${
+            isActive ? 'border-white/5' : 'opacity-40 grayscale border-red-500/10'
+          }`}
+        >
+          {/* Top badges */}
+          <div class="absolute top-1.5 left-1.5 flex flex-col space-y-1">
+            {canal.resolucion && (
+              <span class="bg-[#1e1e2e] text-white/90 border border-white/10 font-bold text-[8px] tracking-widest px-1.5 py-0.5 rounded">
+                {canal.resolucion}
+              </span>
+            )}
+          </div>
+
+          {isPremium && (
+            <div class="absolute top-1.5 right-1.5 bg-brandGold text-[#000000] font-bold text-[8px] px-1.5 py-0.5 rounded shadow-md tracking-wider">
+              PREMIUM
+            </div>
+          )}
+
+          {/* Icon/Logo container */}
+          <div class="w-16 h-16 flex items-center justify-center rounded-2xl bg-[#0e0e15] overflow-hidden my-auto p-1.5">
+            {logoSrc ? (
+              <img 
+                src={logoSrc} 
+                alt={canal.nombre} 
+                class="max-w-full max-h-full object-contain" 
+                onError={() => setImgError(true)} 
+              />
+            ) : (
+              <PlaceholderCanal nombre={canal.nombre} />
+            )}
+          </div>
+
+          <span class="text-xs font-semibold text-white/95 truncate text-center w-full uppercase tracking-wider mt-2 group-hover:text-brandGold transition">
+            {canal.nombre}
+          </span>
+
+          {/* Locked feedback Overlay */}
+          {!isActive && (
+            <div class="absolute inset-0 bg-brandBg/80 backdrop-blur-[1px] rounded-xl flex items-center justify-center">
+              <div class="bg-red-500/15 border border-red-500/30 p-2.5 rounded-full text-red-500">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Main App
     function App() {
       const [activeTab, setActiveTab] = useState('en_vivo');
-      const [currentStream, setCurrentStream] = useState(null); // { id, title, stream_url, img, category, description, type }
+      const [originTab, setOriginTab] = useState('en_vivo');
+      const [currentStream, setCurrentStream] = useState(null); // { id, title, stream_url, img, category, description, type, isSavedReg }
       const [toastMsg, setToastMsg] = useState('');
 
-      // Events States
+      // Events
       const [eventos, setEventos] = useState([]);
-      const [eventsStatus, setEventsStatus] = useState('loading'); // loading, success, error
+      const [eventsStatus, setEventsStatus] = useState('loading');
 
-      // Channels States
+      // Channels
       const [canales, setCanales] = useState([]);
-      const [channelsStatus, setChannelsStatus] = useState('loading'); // loading, success, error
+      const [channelsStatus, setChannelsStatus] = useState('loading');
       const [channelSearch, setChannelSearch] = useState('');
       const [selectedCategory, setSelectedCategory] = useState('Todos');
 
-      // Movies States
+      // Movies
       const [movieSearch, setMovieSearch] = useState('');
+      const [directUrl, setDirectUrl] = useState('');
       const [movieResults, setMovieResults] = useState([]);
-      const [moviesSearchStatus, setMoviesSearchStatus] = useState('idle'); // idle, loading, success, error
+      const [moviesSearchStatus, setMoviesSearchStatus] = useState('idle');
       const [selectedMovie, setSelectedMovie] = useState(null);
       const [movieDetailsStatus, setMovieDetailsStatus] = useState('idle');
-      const [movieSubTab, setMovieSubTab] = useState('search'); // search, recordings
+
+      // Recordings Historial from LocalStorage
       const [recordings, setRecordings] = useState([]);
 
-      // Trigger standard / native Toasts
-      const showToast = (msg) => {
+      const triggerToast = (msg) => {
         if (window.AndroidInterface && window.AndroidInterface.showToast) {
           window.AndroidInterface.showToast(msg);
         } else {
@@ -131,7 +201,6 @@
         }
       };
 
-      // Load recordings history from localStorage
       const loadRecordings = () => {
         try {
           const stored = localStorage.getItem('videx_recordings');
@@ -141,7 +210,7 @@
             setRecordings([]);
           }
         } catch (e) {
-          console.error("Error holding recordings", e);
+          console.error("Error reading localStorage", e);
         }
       };
 
@@ -149,34 +218,65 @@
         loadRecordings();
       }, []);
 
+      // Navigation handler supporting browser state & android physical back button
+      const navigateTo = (tab, push = true) => {
+        setActiveTab(tab);
+        if (tab !== 'reproductor') {
+          setOriginTab(tab);
+        }
+        if (push) {
+          window.history.pushState({ view: tab }, '', '');
+        }
+      };
+
+      // Set up back button tracking
+      useEffect(() => {
+        // Prepare initial replaceState
+        window.history.replaceState({ view: 'en_vivo' }, '', '');
+
+        const handlePop = (e) => {
+          const state = e.state;
+          if (state && state.view) {
+            if (state.view === 'reproductor') {
+              setActiveTab('reproductor');
+            } else {
+              if (activeTab === 'reproductor') {
+                setCurrentStream(null); // Close player
+              }
+              setActiveTab(state.view);
+            }
+          }
+        };
+
+        window.addEventListener('popstate', handlePop);
+        return () => window.removeEventListener('popstate', handlePop);
+      }, [activeTab]);
+
       // FETCH EVENTS
       const fetchEvents = async () => {
         setEventsStatus('loading');
         try {
           const res = await fetch('https://apio.videx.lol/eventosss.json');
-          if (!res.ok) throw new Error('API Error');
+          if (!res.ok) throw new Error();
           const data = await res.json();
           setEventos(data.eventos || []);
           setEventsStatus('success');
         } catch (e) {
-          console.error(e);
           setEventsStatus('error');
         }
       };
 
-      // FETCH CHANNELS
+      // FETCH CANALES
       const fetchChannels = async () => {
         setChannelsStatus('loading');
         try {
           const res = await fetch('https://apio.videx.lol/canales.json');
-          if (!res.ok) throw new Error('API Error');
+          if (!res.ok) throw new Error();
           const data = await res.json();
-          // Extract nested 'canal' structure
           const parsed = data.canales ? data.canales.map(item => item.canal).filter(Boolean) : [];
           setCanales(parsed);
           setChannelsStatus('success');
         } catch (e) {
-          console.error(e);
           setChannelsStatus('error');
         }
       };
@@ -186,7 +286,6 @@
         fetchChannels();
       }, []);
 
-      // Channels category list extracted dynamically
       const categories = useMemo(() => {
         const list = ['Todos'];
         canales.forEach(item => {
@@ -197,106 +296,114 @@
         return list;
       }, [canales]);
 
-      // Debounced search for movies
+      // Movies Debounce search
       useEffect(() => {
         if (!movieSearch.trim()) {
           setMovieResults([]);
           setMoviesSearchStatus('idle');
           return;
         }
-
         setMoviesSearchStatus('loading');
-        const delayDebounceFn = setTimeout(async () => {
+        const delay = setTimeout(async () => {
           try {
             const res = await fetch(`https://apio.videx.lol/movies/sk.php?q=${encodeURIComponent(movieSearch)}`);
-            if (!res.ok) throw new Error('Search failed');
+            if (!res.ok) throw new Error();
             const data = await res.json();
             setMovieResults(data.results || []);
             setMoviesSearchStatus('success');
           } catch (e) {
-            console.error(e);
             setMoviesSearchStatus('error');
           }
         }, 500);
 
-        return () => clearTimeout(delayDebounceFn);
+        return () => clearTimeout(delay);
       }, [movieSearch]);
 
-      // Fetch Movie/Series details
-      const handleSelectMovieResult = async (item) => {
+      // Request movie detail parser v3.php
+      const handleSelectMovieResult = async (url) => {
         setMovieDetailsStatus('loading');
         setSelectedMovie(null);
         try {
-          const res = await fetch(`https://apio.videx.lol/movies/v3.php?url=${encodeURIComponent(item.url)}`);
-          if (!res.ok) throw new Error('Details loading failed');
+          const res = await fetch(`https://apio.videx.lol/movies/v3.php?url=${encodeURIComponent(url)}`);
+          if (!res.ok) throw new Error();
           const data = await res.json();
           setSelectedMovie(data);
           setMovieDetailsStatus('success');
         } catch (e) {
-          console.error(e);
           setMovieDetailsStatus('error');
-          showToast('Error al cargar detalles de la película/serie');
+          triggerToast('Error al conectar con los servidores de video.');
         }
       };
 
-      // Play selected stream
-      const selectStream = (stream) => {
+      // Direct URL Parser
+      const handleDirectUrlOpen = () => {
+        if (!directUrl.trim()) return;
+        if (!directUrl.includes('h5.swplayer.com')) {
+          triggerToast('URL no válida. Debe ser de h5.swplayer.com');
+          return;
+        }
+        handleSelectMovieResult(directUrl.trim());
+      };
+
+      // Select and play dynamic HLS/VOD signal
+      const playContent = (stream) => {
         setCurrentStream(stream);
         setActiveTab('reproductor');
+        window.history.pushState({ view: 'reproductor' }, '', '');
       };
 
       return (
         <div class="flex flex-col min-h-screen bg-[#0a0a0f] text-white">
           
-          {/* Top Branding Header */}
-          <header class="bg-[#12121a]/95 border-b border-white/5 py-4 px-6 flex justify-between items-center sticky top-0 z-30 backdrop-blur-md">
+          {/* Header Branding */}
+          <header class="bg-[#12121a]/95 border-b border-white/5 py-3.5 px-5 flex justify-between items-center sticky top-0 z-30 backdrop-blur-md">
             <div class="flex items-center space-x-2">
-              <span class="w-2.5 h-6 bg-brandGold rounded-full"></span>
-              <h1 class="text-2xl font-black font-title text-white tracking-widest">
+              <span class="w-2.5 h-6 bg-brandGold rounded-full shadow-lg shadow-brandGold/30"></span>
+              <h1 class="text-2xl font-black font-title tracking-widest text-white">
                 VIDEX<span class="text-brandGold">APP</span>
               </h1>
             </div>
+
             {currentStream && activeTab !== 'reproductor' && (
               <button 
-                onClick={() => setActiveTab('reproductor')}
-                class="flex items-center space-x-1.5 bg-brandPurple hover:bg-brandPurple/80 transition text-xs font-semibold px-3 py-1.5 rounded-full text-white shadow-md animate-pulse"
+                onClick={() => navigateTo('reproductor')}
+                class="flex items-center space-x-1.5 bg-brandPurple hover:bg-brandPurple/80 transition text-[11px] font-bold px-3 py-1.5 rounded-full text-white shadow-xl live-pulse border border-brandPurple/30"
               >
-                <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z"/>
                 </svg>
-                <span>REPRODUCTOR</span>
+                <span>SINTONIZANDO</span>
               </button>
             )}
           </header>
 
-          {/* Main Module Content Area */}
           <main class="flex-grow pb-28">
-            
-            {/* TABS 1 — EN VIVO */}
+
+            {/* TAB #1 🔴 EN VIVO */}
             {activeTab === 'en_vivo' && (
-              <div class="px-4 py-5">
+              <div class="px-4 py-5 animate-fade-in">
                 <div class="flex items-center justify-between mb-5">
                   <div class="flex items-center space-x-2">
-                    <span class="relative flex h-3 w-3">
+                    <span class="relative flex h-2.5 w-2.5">
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span class="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+                      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600"></span>
                     </span>
-                    <h2 class="text-xl font-bold font-title tracking-wider text-red-500">EVENTOS DEPORTIVOS</h2>
+                    <h2 class="text-lg font-bold font-title tracking-widest text-red-500 uppercase">TRANSMISIONES EN VIVO</h2>
                   </div>
-                  <button onClick={fetchEvents} class="text-white/40 hover:text-white p-1 rounded-full transition bg-white/5 hover:bg-white/10">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.213 15h-3.07" />
+                  <button onClick={fetchEvents} class="text-white/40 hover:text-white p-1.5 rounded-full bg-white/5 hover:bg-white/10 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                     </svg>
                   </button>
                 </div>
 
                 {eventsStatus === 'loading' && (
                   <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[1, 2, 4, 6].map(i => (
-                      <div key={i} class="bg-[#12121a] rounded-xl overflow-hidden border border-white/5 animate-pulse">
+                    {[1, 2, 3, 4].map(i => (
+                      <div key={i} class="bg-brandSurface rounded-xl overflow-hidden border border-white/5 animate-pulse">
                         <div class="aspect-video bg-white/5"></div>
-                        <div class="p-3 space-y-2">
-                          <div class="h-4 bg-white/10 rounded w-3/4"></div>
+                        <div class="p-3.5 space-y-2">
+                          <div class="h-4 bg-white/10 rounded w-4/5"></div>
                           <div class="h-3 bg-white/5 rounded w-1/2"></div>
                         </div>
                       </div>
@@ -305,17 +412,17 @@
                 )}
 
                 {eventsStatus === 'error' && (
-                  <div class="text-center py-12 px-6 bg-[#12121a] rounded-xl border border-white/5">
-                    <p class="text-white/70 mb-4">Error al cargar los eventos de transmisiones en vivo.</p>
-                    <button onClick={fetchEvents} class="bg-brandPurple text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-brandPurple/80 transition">
-                      Reintentar conexión
+                  <div class="text-center py-12 px-6 bg-brandSurface rounded-xl border border-white/5">
+                    <p class="text-white/70 mb-4 font-semibold text-sm">No pudimos conectar con la base de eventos.</p>
+                    <button onClick={fetchEvents} class="bg-brandPurple text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-brandPurple/80 transition">
+                      VOLVER A INTENTAR
                     </button>
                   </div>
                 )}
 
                 {eventsStatus === 'success' && eventos.length === 0 && (
-                  <div class="text-center py-12 text-white/50 bg-[#12121a] rounded-xl border border-white/5">
-                    No hay eventos activos en este momento.
+                  <div class="text-center py-12 text-white/50 bg-brandSurface rounded-xl border border-white/5 text-sm">
+                    No se registran eventos deportivos programados hoy.
                   </div>
                 )}
 
@@ -326,56 +433,55 @@
                         key={ev.id} 
                         onClick={() => {
                           if (ev.stream_url) {
-                            selectStream({
+                            playContent({
                               id: ev.id,
                               title: ev.titulo,
                               stream_url: ev.stream_url,
                               img: ev.imagen_url,
-                              category: ev.liga,
-                              description: ev.descripcion || `${ev.liga} - ${ev.titulo}`,
+                              category: ev.liga || 'Eventos',
+                              description: ev.descripcion || `Liga: ${ev.liga} - ${ev.titulo}`,
                               type: 'live'
                             });
                           } else {
-                            showToast('Stream no disponible para este evento.');
+                            triggerToast('Enlace de transmisión no ingresado todavía.');
                           }
                         }}
-                        class="bg-[#12121a] hover:bg-[#181826] transition rounded-xl overflow-hidden border border-white/5 cursor-pointer hover:scale-[1.02] duration-200 group flex flex-col justify-between"
+                        class="bg-brandSurface hover:bg-[#181824] transition-all rounded-xl overflow-hidden border border-white/5 cursor-pointer hover:scale-[1.02] duration-200 group flex flex-col justify-between"
                       >
-                        <div class="relative aspect-video w-full bg-black/40">
+                        <div class="relative aspect-video w-full bg-black/40 overflow-hidden">
                           {ev.imagen_url ? (
                             <img src={ev.imagen_url} alt={ev.titulo} class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
                           ) : (
-                            <div class="w-full h-full flex items-center justify-center bg-brandPurple/10">
-                              <span class="font-title text-2xl text-brandPurple/50">TRANS</span>
+                            <div class="w-full h-full flex items-center justify-center bg-brandPurple/5">
+                              <span class="font-title text-2xl text-brandPurple/40">VIDEX LIVE</span>
                             </div>
                           )}
                           
-                          {/* Top Left Status Badge */}
-                          <div class="absolute top-2 left-2 flex items-center space-x-1 bg-red-600 text-[10px] font-black uppercase text-white px-2 py-0.5 rounded-full custom-pulse border border-red-500">
+                          {/* Pulsing badge ALWAYS forced as LIVE based on Correction Rule #3 */}
+                          <div class="absolute top-2 left-2 flex items-center space-x-1.5 bg-red-600 text-[10px] font-black uppercase text-white px-2.5 py-0.5 rounded-full live-pulse border border-red-500 shadow">
                             <span class="w-1.5 h-1.5 bg-white rounded-full"></span>
                             <span>EN VIVO</span>
                           </div>
 
-                          {/* Top Right Channel Badge */}
                           {ev.canal && (
-                            <div class="absolute top-2 right-2 bg-brandGold text-[#000000] text-[10px] font-black uppercase px-2 py-0.5 rounded shadow">
+                            <div class="absolute top-2 right-2 bg-brandGold text-black text-[9px] font-bold px-1.5 py-0.5 rounded shadow tracking-tight">
                               {ev.canal}
                             </div>
                           )}
                         </div>
 
                         <div class="p-3 flex-grow flex flex-col justify-between">
-                          <h3 class="text-sm font-semibold text-white line-clamp-2 leading-tight group-hover:text-brandGold transition mb-2">
+                          <h3 class="text-xs font-semibold text-white/95 line-clamp-2 leading-snug group-hover:text-brandGold transition mb-2">
                             {ev.titulo}
                           </h3>
-                          <div class="text-[11px] text-white/50 space-y-1">
+                          <div class="text-[10px] text-white/50 space-y-0.5">
                             <div class="flex items-center space-x-1">
                               <span class="w-1.5 h-1.5 bg-brandPurple rounded-full"></span>
-                              <span class="truncate font-semibold text-brandPurple">{ev.liga}</span>
+                              <span class="truncate font-semibold text-brandPurple uppercase">{ev.liga}</span>
                             </div>
-                            <div class="flex items-center space-x-1 text-white/40">
-                              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <div class="flex items-center space-x-1 text-white/30 font-medium">
+                              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
                               <span>{ev.hora} ({ev.zona_horaria})</span>
                             </div>
@@ -388,37 +494,37 @@
               </div>
             )}
 
-            {/* TABS 2 — CANALES */}
+            {/* TAB #2 📺 CANALES */}
             {activeTab === 'canales' && (
-              <div class="px-4 py-5">
-                <h2 class="text-xl font-bold font-title tracking-wider text-brandGold mb-4">CANALES DE TELEVISIÓN</h2>
+              <div class="px-4 py-5 animate-fade-in">
+                <h2 class="text-lg font-bold font-title tracking-widest text-brandGold mb-4 uppercase">CANALES DE TELEVISIÓN</h2>
 
-                {/* Sticky Search bar */}
-                <div class="sticky top-16 z-20 bg-[#0a0a0f] py-2 mb-4">
+                {/* Sticky filter bar */}
+                <div class="sticky top-14 z-20 bg-brandBg py-2 mb-4">
                   <div class="relative">
                     <input 
                       type="text" 
-                      placeholder="Buscar canales por nombre o categoría..." 
+                      placeholder="Buscar por nombre o categoría..." 
                       value={channelSearch}
                       onChange={(e) => setChannelSearch(e.target.value)}
-                      class="w-full bg-[#12121a] hover:bg-[#181826] text-white placeholder-white/40 rounded-xl py-3 pl-11 pr-4 border border-white/10 outline-none focus:border-brandGold transition text-sm shadow"
+                      class="w-full bg-brandSurface text-white placeholder-white/30 rounded-xl py-3 pl-10 pr-4 border border-white/5 outline-none focus:border-brandGold transition text-xs font-semibold shadow"
                     />
-                    <svg class="w-5 h-5 absolute left-4 top-3.5 text-white/45" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    <svg class="w-4 h-4 absolute left-3.5 top-3.5 text-white/35" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.602 10.602z" />
                     </svg>
                   </div>
                 </div>
 
-                {/* Categories Flowing list CHIPS */}
-                <div class="flex overflow-x-auto pb-4 gap-2 scroll-smooth select-none">
+                {/* Dynamic Category Chips */}
+                <div class="flex overflow-x-auto pb-4 gap-2 select-none no-scrollbar">
                   {categories.map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setSelectedCategory(cat)}
-                      class={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                      class={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-200 ${
                         selectedCategory === cat 
-                          ? 'bg-brandGold text-[#0a0a0f]' 
-                          : 'bg-[#12121a] text-white/70 hover:bg-white/5 border border-white/5'
+                          ? 'bg-brandGold text-black shadow shadow-brandGold/25' 
+                          : 'bg-brandSurface text-white/50 hover:bg-white/5 border border-white/5'
                       }`}
                     >
                       {cat}
@@ -427,28 +533,27 @@
                 </div>
 
                 {channelsStatus === 'loading' && (
-                  <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 mt-2">
+                  <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                     {[1, 2, 3, 4, 5, 6].map(i => (
-                      <div key={i} class="bg-[#12121a] aspect-square rounded-xl flex flex-col justify-between p-3 border border-white/5 animate-pulse">
-                        <div class="w-12 h-12 rounded-full bg-white/5 mx-auto"></div>
-                        <div class="h-3 bg-white/10 rounded w-3/4 mx-auto"></div>
+                      <div key={i} class="bg-brandSurface rounded-xl aspect-[4/5] p-3 border border-white/5 animate-pulse flex flex-col justify-between">
+                        <div class="w-12 h-12 bg-white/5 rounded-2xl mx-auto"></div>
+                        <div class="h-3 bg-white/10 rounded w-2/3 mx-auto"></div>
                       </div>
                     ))}
                   </div>
                 )}
 
                 {channelsStatus === 'error' && (
-                  <div class="text-center py-12 px-6 bg-[#12121a] rounded-xl border border-white/5">
-                    <p class="text-white/70 mb-4 font-semibold">Error al conectar con los canales de transmisión.</p>
-                    <button onClick={fetchChannels} class="bg-brandGold text-black font-semibold px-4 py-2 rounded-lg text-sm hover:bg-brandGold/80 transition">
-                      Reintentar conexión
+                  <div class="text-center py-12 px-6 bg-brandSurface rounded-xl border border-white/5">
+                    <p class="text-white/70 mb-4 font-semibold text-sm">Error de sincronización de canales.</p>
+                    <button onClick={fetchChannels} class="bg-brandGold text-black text-xs font-black px-4 py-2 rounded-lg hover:bg-brandGold/90 transition">
+                      REINTENTAR SINCRO
                     </button>
                   </div>
                 )}
 
                 {channelsStatus === 'success' && (
                   (() => {
-                    // Filter logic
                     const filtered = canales.filter(ch => {
                       const matchesCategory = selectedCategory === 'Todos' || ch.categoria === selectedCategory;
                       const matchesText = !channelSearch.trim() || 
@@ -459,88 +564,35 @@
 
                     if (filtered.length === 0) {
                       return (
-                        <div class="text-center py-12 text-white/40">
-                          No se encontraron canales que coincidan con la búsqueda.
+                        <div class="text-center py-12 text-white/40 text-sm">
+                          Ningún canal coincide con los filtros aplicados.
                         </div>
                       );
                     }
 
                     return (
                       <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                        {filtered.map(ch => {
-                          const isLogoAvailable = ch.img || ch.logo_url;
-                          const logoSrc = ch.img || ch.logo_url;
-                          const isActive = ch.activo !== false;
-
-                          return (
-                            <div 
-                              key={ch.id}
-                              onClick={() => {
-                                if (!isActive) {
-                                  showToast('Este canal es premium o inactivo temporalmente.');
-                                  return;
-                                }
-                                selectStream({
-                                  id: ch.id,
-                                  title: ch.nombre,
-                                  stream_url: ch.stream_url,
-                                  img: logoSrc,
-                                  category: ch.categoria || 'Canales',
-                                  description: ch.descripcion || `Transmisión en vivo de ${ch.nombre}.`,
-                                  type: 'channel'
-                                });
-                              }}
-                              class={`relative bg-[#12121a]/90 rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] border cursor-pointer hover:scale-[1.05] transition-all duration-200 ${
-                                isActive 
-                                  ? 'border-white/5 hover:bg-[#181826] hover:border-brandPurple' 
-                                  : 'opacity-50 grayscale border-red-500/10'
-                              }`}
-                            >
-                              {/* Corner Badges */}
-                              <div class="absolute top-1.5 left-1.5 flex flex-col space-y-1">
-                                {ch.resolucion && (
-                                  <span class="bg-white/10 text-white border border-white/10 font-bold text-[8px] tracking-tight px-1 py-0.2 rounded">
-                                    {ch.resolucion}
-                                  </span>
-                                )}
-                              </div>
-
-                              {ch.es_premium && (
-                                <div class="absolute top-1.5 right-1.5 bg-brandGold text-[#000000] font-black text-[8px] py-0.2 px-1 rounded">
-                                  PREMIUM
-                                </div>
-                              )}
-
-                              {/* Logo view */}
-                              <div class="w-16 h-16 flex items-center justify-center rounded-2xl bg-black/40 overflow-hidden my-auto p-1 text-center">
-                                {isLogoAvailable ? (
-                                  <img src={logoSrc} alt={ch.nombre} class="max-w-full max-h-full object-contain" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
-                                ) : (
-                                  <div class="flex flex-col items-center">
-                                    <svg class="w-8 h-8 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4v16M17 4v16M3 8h18M3 16h18" />
-                                    </svg>
-                                  </div>
-                                )}
-                              </div>
-
-                              <span class="text-xs font-bold text-white/90 truncate text-center w-full uppercase mt-2">
-                                {ch.nombre}
-                              </span>
-
-                              {/* Locked Overlay */}
-                              {!isActive && (
-                                <div class="absolute inset-0 bg-brandBg/80 backdrop-blur-[1px] rounded-xl flex items-center justify-center">
-                                  <div class="bg-red-500/20 border border-red-500/30 p-2 rounded-full text-red-500">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                    </svg>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                        {filtered.map(ch => (
+                          <ChannelIcon 
+                            key={ch.id}
+                            canal={ch}
+                            onClick={() => {
+                              if (ch.activo === false) {
+                                triggerToast('Canal en mantención o fuera de servicio temporalmente.');
+                                return;
+                              }
+                              playContent({
+                                id: ch.id,
+                                title: ch.nombre,
+                                stream_url: ch.stream_url,
+                                img: ch.img || ch.logo_url,
+                                category: ch.categoria || 'Canales',
+                                description: ch.descripcion || `Señal en vivo de ${ch.nombre}.`,
+                                type: 'channel'
+                              });
+                            }}
+                          />
+                        ))}
                       </div>
                     );
                   })()
@@ -548,332 +600,347 @@
               </div>
             )}
 
-            {/* TABS 3 — PELÍCULAS & SERIES & REPETICIONES */}
+            {/* TAB #3 🎬 PELÍCULAS */}
             {activeTab === 'peliculas' && (
-              <div class="px-4 py-5">
+              <div class="px-4 py-5 animate-fade-in space-y-6">
                 
-                {/* Switcher Header: Películas Search vs. Grabaciones History */}
-                <div class="flex border-b border-white/5 mb-5 select-none">
-                  <button 
-                    onClick={() => setMovieSubTab('search')}
-                    class={`flex-1 py-3 text-center text-sm font-semibold tracking-wider font-title flex items-center justify-center space-x-1.5 transition ${
-                      movieSubTab === 'search' 
-                        ? 'text-brandGold border-b-2 border-brandGold font-bold' 
-                        : 'text-white/40'
-                    }`}
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.1" d="M7 4v16M17 4v16M3 8h18M3 16h18" />
+                {/* Visual Header */}
+                <div class="bg-gradient-to-r from-brandSurface to-[#12121e] border border-white/5 rounded-2xl p-6 text-center max-w-xl mx-auto shadow-xl backdrop-blur-md">
+                  <h3 class="text-2xl font-black font-title tracking-widest text-brandPurple mb-1">CINE DIGITAL DE ALTO BITRATE</h3>
+                  <p class="text-[9px] text-brandGold font-bold uppercase tracking-widest mb-4">Servidor ultraflix de contingencia</p>
+                  
+                  <div class="relative">
+                    <input 
+                      type="text" 
+                      placeholder="Escribe el título de tu película..." 
+                      value={movieSearch}
+                      onChange={(e) => setMovieSearch(e.target.value)}
+                      class="w-full bg-[#0a0a0f] text-white placeholder-white/30 rounded-xl py-3 pl-11 pr-4 border border-white/10 outline-none focus:border-brandPurple transition text-xs font-semibold shadow text-center"
+                    />
+                    <svg class="w-4 h-4 absolute left-4 top-3.5 text-white/35" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.602 10.602z" />
                     </svg>
-                    <span>BUSCADOR PELÍCULAS</span>
-                  </button>
-                  <button 
-                    onClick={() => {
-                      loadRecordings();
-                      setMovieSubTab('recordings');
-                    }}
-                    class={`flex-1 py-3 text-center text-sm font-semibold tracking-wider font-title flex items-center justify-center space-x-1.5 transition ${
-                      movieSubTab === 'recordings' 
-                        ? 'text-brandPurple border-b-2 border-brandPurple font-bold' 
-                        : 'text-white/40'
-                    }`}
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.1" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>REC (REPETICIONES)</span>
-                  </button>
+                  </div>
+                  
+                  <p class="text-[11px] text-white/45 italic mt-3.5">
+                    💡 <span class="font-bold">Sugerencia:</span> Si no encuentras tu película, intenta con el título en inglés
+                  </p>
                 </div>
 
-                {/* Sub tab: Search Movie/Series */}
-                {movieSubTab === 'search' && (
-                  <div>
-                    {/* Centered Large Search Input */}
-                    <div class="bg-[#12121a]/60 border border-white/5 rounded-2xl p-6 text-center max-w-xl mx-auto mb-6 shadow-md backdrop-blur-sm">
-                      <h3 class="text-3xl font-black font-title tracking-widest text-[#ffffff] mb-1">CINE ILIMITADO</h3>
-                      <p class="text-xs text-white/40 mb-4 uppercase tracking-widest">Servidor global HD</p>
-                      
-                      <div class="relative">
-                        <input 
-                          type="text" 
-                          placeholder="Escribe el nombre de la película o serie..." 
-                          value={movieSearch}
-                          onChange={(e) => setMovieSearch(e.target.value)}
-                          class="w-full bg-[#1e1e2d] text-white placeholder-white/30 rounded-xl py-3.5 pl-12 pr-4 border border-white/10 outline-none focus:border-brandPurple transition text-sm text-center font-semibold"
-                        />
-                        <svg class="w-5 h-5 absolute left-4 top-4 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                      </div>
-                      
-                      <p class="text-xs text-white/50 italic mt-3 font-semibold">
-                        💡 "Si no encuentras tu película, intenta con el título original en inglés"
-                      </p>
-                    </div>
-
-                    {/* Suggestions output dropdown context */}
-                    {moviesSearchStatus === 'loading' && (
-                      <div class="flex flex-col items-center py-6 space-y-2">
-                        <div class="w-8 h-8 border-4 border-brandPurple border-t-transparent rounded-full animate-spin"></div>
-                        <p class="text-xs text-white/40">Buscando títulos...</p>
-                      </div>
-                    )}
-
-                    {moviesSearchStatus === 'error' && (
-                      <div class="text-center py-6 text-red-400 text-sm">
-                        No se pudo contactar el catálogo. Reintenta la búsqueda.
-                      </div>
-                    )}
-
-                    {moviesSearchStatus === 'success' && movieResults.length === 0 && (
-                      <div class="text-center py-6 text-white/40 text-sm">
-                        No se encontraron resultados para tu búsqueda.
-                      </div>
-                    )}
-
-                    {moviesSearchStatus === 'success' && movieResults.length > 0 && !selectedMovie && (
-                      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {movieResults.map(res => (
-                          <div 
-                            key={res.url}
-                            onClick={() => handleSelectMovieResult(res)}
-                            class="bg-[#12121a] hover:bg-[#181826] border border-white/5 rounded-xl overflow-hidden cursor-pointer hover:scale-105 transition-all duration-200"
-                          >
-                            <div class="aspect-[2/3] bg-black/40 relative">
-                              {res.image ? (
-                                <img src={res.image} alt={res.title} class="w-full h-full object-cover" />
-                              ) : (
-                                <div class="w-full h-full flex items-center justify-center text-white/20">
-                                  <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4v16M17 4v16M3 8h18M3 16h18" />
-                                  </svg>
-                                </div>
-                              )}
-                            </div>
-                            <div class="p-3">
-                              <h4 class="text-xs font-bold line-clamp-2 text-white uppercase text-center">{res.title}</h4>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Selected content detail Panel */}
-                    {selectedMovie && (
-                      <div class="bg-[#12121a]/95 border border-white/10 rounded-2xl p-5 select-none relative animate-fade-in mb-6">
-                        <button 
-                          onClick={() => setSelectedMovie(null)}
-                          class="absolute top-4 right-4 text-white/40 hover:text-white bg-white/5 hover:bg-white/10 p-2 rounded-full"
-                        >
-                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-
-                        <div class="flex flex-col md:flex-row gap-6">
-                          {/* Left Cover */}
-                          <div class="w-full md:w-48 aspect-[2/3] rounded-xl overflow-hidden bg-black/40 flex-shrink-0 mx-auto md:mx-0">
-                            {selectedMovie.cover ? (
-                              <img src={selectedMovie.cover} alt={selectedMovie.title} class="w-full h-full object-cover" />
-                            ) : (
-                              <div class="w-full h-full flex items-center justify-center text-white/10 uppercase font-bold text-center">Sin Póster</div>
-                            )}
-                          </div>
-
-                          {/* Right Meta details */}
-                          <div class="flex-grow">
-                            <h3 class="text-2xl font-black font-title tracking-wider text-brandGold mb-2">{selectedMovie.title}</h3>
-                            
-                            {selectedMovie.genres && (
-                              <div class="flex flex-wrap gap-1.5 mb-3">
-                                {selectedMovie.genres.map(g => (
-                                  <span key={g} class="bg-brandPurple/30 border border-brandPurple/30 text-white font-semibold text-[10px] px-2 py-0.5 rounded-full uppercase">
-                                    {g}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-
-                            <p class="text-sm text-white/70 leading-relaxed mb-4">{selectedMovie.description || "Sin descripción disponible."}</p>
-
-                            {/* Versions / Audio Language selection */}
-                            {selectedMovie.versions && selectedMovie.versions.length > 0 && (
-                              <div class="mb-5">
-                                <label class="block text-xs font-bold text-white/40 uppercase mb-2">Idiomas / Versiones disponibles:</label>
-                                <div class="flex flex-wrap gap-2">
-                                  {selectedMovie.versions.map(ver => (
-                                    <button 
-                                      key={ver.lang}
-                                      onClick={() => {
-                                        // Update to that language details URL
-                                        handleSelectMovieResult(ver);
-                                      }}
-                                      class="flex items-center space-x-2 bg-[#1e1e2d] hover:bg-[#252538] border border-white/5 hover:border-brandPurple transition-all px-3 py-1.5 rounded-xl text-xs text-white"
-                                    >
-                                      {ver.flag && <img src={ver.flag} class="w-4 h-3 object-cover rounded" onError={(e)=>{e.target.style.display='none'}}/>}
-                                      <span>{ver.lang_label || ver.lang}</span>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* PLAY BUTTON FOR MOVIE (Single Episode) */}
-                            {selectedMovie.episodes && selectedMovie.episodes.length === 1 && (
-                              <div>
-                                <button 
-                                  onClick={() => {
-                                    // final stream resolver template
-                                    const finalStream = `https://ultraflixplayer.vercel.app/stream.m3u8?url=${encodeURIComponent(selectedMovie.episodes[0].url)}`;
-                                    selectStream({
-                                      id: selectedMovie.episodes[0].url,
-                                      title: selectedMovie.title,
-                                      stream_url: finalStream,
-                                      img: selectedMovie.cover,
-                                      category: selectedMovie.genres ? selectedMovie.genres.join(', ') : 'Película',
-                                      description: selectedMovie.description,
-                                      type: 'movie'
-                                    });
-                                  }}
-                                  class="w-full md:w-auto bg-brandGold hover:bg-brandGold/90 transition text-black font-bold flex items-center justify-center space-x-2 py-3 px-8 rounded-xl text-base shadow"
-                                >
-                                  <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                                    <path d="M8 5v14l11-7z"/>
-                                  </svg>
-                                  <span>REPRODUCIR AHORA</span>
-                                </button>
-                              </div>
-                            )}
-
-                            {/* EPISODE SELECTOR FOR SERIES (Multiple Episodes) */}
-                            {selectedMovie.episodes && selectedMovie.episodes.length > 1 && (
-                              <div class="mt-4">
-                                <div class="flex justify-between items-center mb-3 border-b border-white/5 pb-2">
-                                  <span class="text-sm font-bold text-brandPurple uppercase">Episodios disponibles ({selectedMovie.episodes.length})</span>
-                                </div>
-
-                                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-60 overflow-y-auto pr-1">
-                                  {selectedMovie.episodes.map(ep => (
-                                    <button
-                                      key={ep.episode}
-                                      onClick={() => {
-                                        const finalStream = `https://ultraflixplayer.vercel.app/stream.m3u8?url=${encodeURIComponent(ep.url)}`;
-                                        selectStream({
-                                          id: ep.url,
-                                          title: `${selectedMovie.title} - ${ep.label || `Episodio ${ep.episode}`}`,
-                                          stream_url: finalStream,
-                                          img: selectedMovie.cover,
-                                          category: selectedMovie.title,
-                                          description: `${selectedMovie.title}. Episodio número ${ep.episode}.`,
-                                          type: 'series_ep'
-                                        });
-                                      }}
-                                      class="bg-[#1e1e2d] hover:bg-brandPurple/20 border border-white/5 hover:border-brandPurple transition p-3 rounded-xl flex flex-col justify-between items-start text-left min-h-[90px]"
-                                    >
-                                      <span class="text-xs text-white/50 font-semibold">{ep.label || `Episodio ${ep.episode}`}</span>
-                                      <span class="text-[10px] font-black uppercase text-brandGold bg-brandGold/10 px-1.5 py-0.5 rounded mt-2">REPRODUCIR</span>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                {/* Movies Results feedback */}
+                {moviesSearchStatus === 'loading' && (
+                  <div class="flex flex-col items-center py-6 space-y-2">
+                    <div class="w-7 h-7 border-3 border-brandPurple border-t-transparent rounded-full animate-spin"></div>
+                    <p class="text-xs text-white/40 font-medium">Buscando en catálogos...</p>
                   </div>
                 )}
 
-                {/* Sub tab: Recordings History */}
-                {movieSubTab === 'recordings' && (
-                  <div>
-                    <div class="bg-[#12121a]/60 border border-white/5 rounded-2xl p-4 text-center max-w-xl mx-auto mb-6">
-                      <h4 class="text-lg font-bold font-title tracking-wider text-brandPurple">🔁 REPETICIONES GUARDADAS</h4>
-                      <p class="text-xs text-white/40 mt-1">
-                        Las grabaciones se descargan en formato webm directamente a la carpeta de descargas de tu dispositivo. La lista inferior muestra tu historial local.
-                      </p>
-                    </div>
+                {moviesSearchStatus === 'error' && (
+                  <div class="text-center py-6 text-red-400 text-xs font-semibold">
+                    Error al contactar con el indexador de películas. Reintente.
+                  </div>
+                )}
 
-                    {recordings.length === 0 ? (
-                      <div class="text-center py-12 text-white/40">
-                        No hay repeticiones guardadas en tu historial. Comienza a grabar transmisiones en vivo en el Reproductor.
-                      </div>
-                    ) : (
-                      <div class="space-y-3">
-                        {recordings.map((rec) => (
-                          <div 
-                            key={rec.id}
-                            class="bg-[#12121a] rounded-xl p-4 border border-white/5 flex items-center justify-between shadow flex-wrap gap-3"
-                          >
-                            <div class="flex-grow">
-                              <h5 class="text-sm font-semibold uppercase tracking-wide text-brandPurple">{rec.name}</h5>
-                              <p class="text-xs text-white/40 mt-0.5">Fecha: {rec.date}</p>
-                              {rec.duration && <p class="text-xs text-brandGold font-medium mt-0.5">Duración: {rec.duration}</p>}
+                {moviesSearchStatus === 'success' && movieResults.length === 0 && (
+                  <div class="text-center py-6 text-white/40 text-xs font-medium">
+                    No se encontraron películas o series indexadas con ese término.
+                  </div>
+                )}
+
+                {/* Grid suggestions */}
+                {moviesSearchStatus === 'success' && movieResults.length > 0 && !selectedMovie && (
+                  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {movieResults.map(res => (
+                      <div 
+                        key={res.url}
+                        onClick={() => handleSelectMovieResult(res.url)}
+                        class="bg-brandSurface hover:bg-[#181824] border border-white/5 hover:border-brandPurple/30 rounded-xl overflow-hidden cursor-pointer hover:scale-[1.03] transition-all duration-200 shadow-md flex flex-col justify-between"
+                      >
+                        <div class="aspect-[2/3] bg-black/40 relative">
+                          {res.image ? (
+                            <img src={res.image} alt={res.title} class="w-full h-full object-cover" />
+                          ) : (
+                            <div class="w-full h-full flex items-center justify-center text-white/10">
+                              <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                              </svg>
                             </div>
-                            
-                            <div class="flex items-center space-x-2">
-                              {/* Play Recorded Item */}
-                              <button
-                                onClick={() => {
-                                  if (rec.url) {
-                                    selectStream({
-                                      id: rec.id,
-                                      title: `Grabación: ${rec.name}`,
-                                      stream_url: rec.url,
-                                      img: '',
-                                      category: 'Repetición',
-                                      description: `Historial de streaming grabado el ${rec.date}.`,
-                                      type: 'recorded'
-                                    });
-                                  } else {
-                                    showToast('El archivo temporal para esta sesión ya no está disponible, pero sigue en tus descargas locales.');
-                                  }
-                                }}
-                                class="bg-brandPurple/20 hover:bg-brandPurple text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center space-x-1 transition"
-                              >
-                                <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                                  <path d="M8 5v14l11-7z"/>
-                                </svg>
-                                <span>▶ REPRODUCIR</span>
-                              </button>
+                          )}
+                        </div>
+                        <div class="p-2.5">
+                          <h4 class="text-xs font-bold line-clamp-1 text-white uppercase tracking-tight text-center">{res.title}</h4>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-                              {/* Delete Recorded Registry */}
-                              <button
-                                onClick={() => {
-                                  const filtered = recordings.filter(item => item.id !== rec.id);
-                                  localStorage.setItem('videx_recordings', JSON.stringify(filtered));
-                                  setRecordings(filtered);
-                                  showToast('Grabación eliminada de la lista histórica');
-                                }}
-                                class="bg-red-500/10 hover:bg-red-500 hover:text-white p-2 rounded-lg text-red-500 transition"
-                                title="Eliminar del historial"
-                              >
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
+                {/* Movie/Series details Panel */}
+                {movieDetailsStatus === 'loading' && (
+                  <div class="flex flex-col items-center py-10 space-y-2 max-w-xl mx-auto">
+                    <div class="w-7 h-7 border-3 border-brandGold border-t-transparent rounded-full animate-spin"></div>
+                    <p class="text-xs text-white/40">Compilando pistas y versiones...</p>
+                  </div>
+                )}
+
+                {movieDetailsStatus === 'success' && selectedMovie && (
+                  <div class="bg-brandSurface border border-white/10 rounded-2xl p-5 relative animate-fade-in max-w-2xl mx-auto shadow-2xl">
+                    <button 
+                      onClick={() => setSelectedMovie(null)}
+                      class="absolute top-4 right-4 text-white/40 hover:text-white bg-white/5 p-1.5 rounded-full"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+
+                    <div class="flex flex-col sm:flex-row gap-5">
+                      <div class="w-36 aspect-[2/3] rounded-xl overflow-hidden bg-black/40 flex-shrink-0 mx-auto sm:mx-0">
+                        {selectedMovie.cover ? (
+                          <img src={selectedMovie.cover} alt={selectedMovie.title} class="w-full h-full object-cover" />
+                        ) : (
+                          <div class="w-full h-full flex items-center justify-center text-white/10 uppercase text-[10px] font-bold text-center">Sin Póster</div>
+                        )}
+                      </div>
+
+                      <div class="flex-grow">
+                        <h3 class="text-lg font-extrabold text-brandGold uppercase tracking-wide mb-1 text-center sm:text-left">
+                          {selectedMovie.title}
+                        </h3>
+                        
+                        {selectedMovie.genres && (
+                          <div class="flex flex-wrap gap-1 mb-3 justify-center sm:justify-start">
+                            {selectedMovie.genres.map(g => (
+                              <span key={g} class="bg-white/5 border border-white/10 text-white/70 font-semibold text-[9px] px-2 py-0.5 rounded-full uppercase">
+                                {g}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        <p class="text-xs text-white/70 leading-relaxed mb-4 text-center sm:text-left select-text">
+                          {selectedMovie.description || "Trama no ingresada por el indexador."}
+                        </p>
+
+                        {/* Versions Selector if multiple audios */}
+                        {selectedMovie.versions && selectedMovie.versions.length > 0 && (
+                          <div class="mb-4">
+                            <span class="block text-[10px] font-bold text-white/40 uppercase mb-1.5">Traducciones disponibles:</span>
+                            <div class="flex flex-wrap gap-1.5">
+                              {selectedMovie.versions.map(ver => (
+                                <button 
+                                  key={ver.lang}
+                                  onClick={() => handleSelectMovieResult(ver.url)}
+                                  class="flex items-center space-x-1.5 bg-[#171722] hover:bg-brandPurple/20 border border-white/5 hover:border-brandPurple/30 px-2.5 py-1.5 rounded-lg text-[10px] text-white/90 transition-all font-semibold"
+                                >
+                                  {ver.flag && <img src={ver.flag} class="w-3.5 h-2.5 object-cover rounded-sm" onError={(e)=>{e.target.style.display='none'}}/>}
+                                  <span>{ver.lang_label || ver.lang}</span>
+                                </button>
+                              ))}
                             </div>
                           </div>
-                        ))}
+                        )}
+
+                        {/* Movie Single reproducer button */}
+                        {selectedMovie.episodes && selectedMovie.episodes.length === 1 && (
+                          <button 
+                            onClick={() => {
+                              const finalUrl = `https://ultraflixplayer.vercel.app/stream.m3u8?url=${encodeURIComponent(selectedMovie.episodes[0].url)}`;
+                              playContent({
+                                id: selectedMovie.episodes[0].url,
+                                title: selectedMovie.title,
+                                stream_url: finalUrl,
+                                img: selectedMovie.cover,
+                                category: selectedMovie.genres ? selectedMovie.genres.join(', ') : 'Película',
+                                description: selectedMovie.description,
+                                type: 'movie'
+                              });
+                            }}
+                            class="w-full sm:w-auto bg-brandGold text-black font-black text-xs tracking-wider flex items-center justify-center space-x-1.5 py-2.5 px-6 rounded-xl shadow-lg hover:bg-brandGold/90 transition"
+                          >
+                            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                              <path d="M8 5v14l11-7z"/>
+                            </svg>
+                            <span>REPRODUCIR</span>
+                          </button>
+                        )}
+
+                        {/* Series episodes grid */}
+                        {selectedMovie.episodes && selectedMovie.episodes.length > 1 && (
+                          <div class="mt-3">
+                            <span class="block text-[10px] font-semibold text-brandPurple uppercase mb-2 tracking-wider">Episodios ({selectedMovie.episodes.length})</span>
+                            <div class="grid grid-cols-3 gap-1.5 max-h-40 overflow-y-auto pr-1">
+                              {selectedMovie.episodes.map(ep => (
+                                <button
+                                  key={ep.episode}
+                                  onClick={() => {
+                                    const finalUrl = `https://ultraflixplayer.vercel.app/stream.m3u8?url=${encodeURIComponent(ep.url)}`;
+                                    playContent({
+                                      id: ep.url,
+                                      title: `${selectedMovie.title} - ${ep.label || `Ep. ${ep.episode}`}`,
+                                      stream_url: finalUrl,
+                                      img: selectedMovie.cover,
+                                      category: selectedMovie.title,
+                                      description: `Año / Temporada: Episodio ${ep.episode}.`,
+                                      type: 'series'
+                                    });
+                                  }}
+                                  class="bg-[#171722] hover:bg-brandPurple/20 border border-white/5 px-2 py-2 rounded-lg text-left text-[11px] flex flex-col justify-between min-h-[50px] transition"
+                                >
+                                  <span class="text-white/40 font-bold truncate">{ep.label || `Episodio ${ep.episode}`}</span>
+                                  <span class="text-[9px] font-black text-brandGold uppercase tracking-tight mt-1">Sintonizar</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ADICIÓN — BÚSQUEDA POR URL DIRECTA (Collapsible card) */}
+                <div class="border border-white/5 bg-brandSurface/40 rounded-2xl p-4 max-w-xl mx-auto shadow-md">
+                  <details class="group select-none">
+                    <summary class="list-none flex items-center justify-between cursor-pointer font-semibold text-xs text-white/50 group-open:text-brandGold transition">
+                      <span class="tracking-wide uppercase font-bold flex items-center space-x-1.5">
+                        <span>❓ ¿No encuentras tu contenido? Prueba URL externa</span>
+                      </span>
+                      <svg class="w-4 h-4 transform group-open:rotate-180 transition duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                      </svg>
+                    </summary>
+
+                    <div class="mt-4 border-t border-white/5 pt-4 space-y-3">
+                      <p class="text-[11px] text-white/40 leading-snug">
+                        Búscalo directamente en el visualizador original de Swplayer: <a href="https://h5.swplayer.com" target="_blank" class="text-brandGold hover:underline font-bold">h5.swplayer.com</a>, copia la dirección web y pégala abajo:
+                      </p>
+                      
+                      <div class="flex gap-2">
+                        <input 
+                          type="text" 
+                          placeholder="https://h5.swplayer.com/es/detail/movie/..." 
+                          value={directUrl}
+                          onChange={(e) => setDirectUrl(e.target.value)}
+                          class="flex-grow bg-[#0c0c12] text-white placeholder-white/20 border border-white/5 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-brandGold"
+                        />
+                        <button 
+                          onClick={handleDirectUrlOpen}
+                          class="bg-brandGold text-black font-extrabold text-xs px-4 py-2 rounded-xl hover:bg-brandGold/90 transition shadow-md flex items-center space-x-1"
+                        >
+                          <span>▶</span>
+                          <span>ABRIR</span>
+                        </button>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            )}
+
+            {/* TAB #4 🔁 GRABACIONES */}
+            {activeTab === 'grabaciones' && (
+              <div class="px-4 py-5 animate-fade-in">
+                <h2 class="text-lg font-bold font-title tracking-widest text-[#7c3aed] uppercase mb-4">REPETICIONES LOCALES</h2>
+                
+                <div class="bg-brandSurface border border-white/5 rounded-2xl p-4 mb-6 relative overflow-hidden">
+                  <div class="absolute -right-12 -top-12 w-28 h-28 bg-[#7c3aed]/5 rounded-full blur-2xl"></div>
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-[#7c3aed] mb-1">📁 ARCHIVO DE GRABACIÓN DIRECTO</h4>
+                  <p class="text-[11px] text-white/45 leading-relaxed font-semibold">
+                    Las grabaciones se descargan automáticamente en formato webm en la carpeta Descargas de tu dispositivo. Esta sección conserva el historial de repeticiones realizadas.
+                  </p>
+                </div>
+
+                {recordings.length === 0 ? (
+                  <div class="text-center py-16 text-white/40 bg-brandSurface/40 border border-white/5 rounded-2xl select-none">
+                    <svg class="w-12 h-12 text-white/10 mx-auto mb-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <p class="font-bold text-sm">Aún no tienes grabaciones.</p>
+                  </div>
+                ) : (
+                  <div class="space-y-3">
+                    {recordings.map((rec) => (
+                      <div 
+                        key={rec.id}
+                        class="bg-brandSurface rounded-2xl p-4 border border-white/5 flex items-center justify-between shadow gap-3 flex-wrap"
+                      >
+                        <div class="flex-grow min-w-[200px]">
+                          <h5 class="text-xs font-bold uppercase tracking-wide text-brandPurple line-clamp-1">{rec.titulo}</h5>
+                          <p class="text-[10px] text-white/40 mt-1 font-semibold flex items-center gap-1">
+                            <span>🕒 {rec.fecha}</span>
+                            <span>•</span>
+                            <span>💾 {rec.nombreArchivo || 'Grabación'}</span>
+                          </p>
+                          {rec.duracion && (
+                            <span class="inline-block text-[9px] bg-brandPurple/10 border border-brandPurple/20 text-[#a78bfa] px-2 py-0.5 rounded font-black tracking-wider uppercase mt-1.5">
+                              REC {rec.duracion}
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                          {/* Play file locally */}
+                          {rec.blobUrl && (
+                            <button
+                              onClick={() => {
+                                playContent({
+                                  id: rec.id,
+                                  title: `REC: ${rec.titulo}`,
+                                  stream_url: rec.blobUrl,
+                                  isSavedReg: true,
+                                  category: 'Grabación',
+                                  description: `Visualizador de grabación local guardada.`
+                                });
+                              }}
+                              class="bg-brandPurple text-white px-3.5 py-2 rounded-xl text-xs font-bold leading-none tracking-wider flex items-center space-x-1 hover:bg-brandPurple/90 transition shadow-md"
+                            >
+                              <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z"/>
+                              </svg>
+                              <span>VER</span>
+                            </button>
+                          )}
+
+                          {/* Trash button */}
+                          <button
+                            onClick={() => {
+                              const remaining = recordings.filter(item => item.id !== rec.id);
+                              localStorage.setItem('videx_recordings', JSON.stringify(remaining));
+                              setRecordings(remaining);
+                              triggerToast('Historial depurado exitosamente.');
+                            }}
+                            class="bg-red-500/10 hover:bg-red-600 hover:text-white text-red-500 p-2.5 rounded-xl transition"
+                            title="Eliminar de la lista"
+                          >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
             )}
 
-            {/* TAB 4 — DETALLES DEL REPRODUCTOR */}
+            {/* TAB #5 🎬 REPRODUCTOR CENTRAL */}
             {activeTab === 'reproductor' && (
-              <div class="px-0 sm:px-4 py-5 select-none max-w-4xl mx-auto">
+              <div class="px-0 sm:px-4 py-5 max-w-3xl mx-auto select-none animate-fade-in lg:mt-3">
                 {currentStream ? (
                   <VideoPlayer 
                     stream={currentStream} 
-                    onShowToast={showToast} 
+                    triggerToast={triggerToast} 
+                    onClosing={() => {
+                      navigateTo(originTab, false);
+                      setCurrentStream(null);
+                    }}
                     onRecordingAdded={loadRecordings}
                   />
                 ) : (
-                  <div class="text-center py-12 text-white/50 bg-[#12121a] rounded-xl p-5 mx-4">
-                    Selecciona un contenido (evento, canal o película) para cargar el reproductor.
+                  <div class="text-center py-12 text-white/50 bg-brandSurface rounded-2xl border border-white/5 mx-4">
+                    Ningún stream activo. Seleccione canales o eventos para sintonizar señales.
                   </div>
                 )}
               </div>
@@ -881,701 +948,752 @@
 
           </main>
 
-          {/* Toast Notification popups */}
+          {/* Fallback internal Toast overlays */}
           {toastMsg && (
             <Toast message={toastMsg} onClose={() => setToastMsg('')} />
           )}
 
-          {/* Bottom Native Navigation Tab Bar */}
-          <nav class="fixed bottom-0 left-0 right-0 bg-[#12121a] border-t border-white/5 flex py-2 z-40 select-none shadow-2xl backdrop-blur-md">
+          {/* Fixed bottom navigation tabs bar */}
+          <nav class="fixed bottom-0 left-0 right-0 bg-[#0c0c12]/95 border-t border-white/5 flex py-2 z-40 select-none shadow-2xl backdrop-blur-md">
             
             <button 
-              onClick={() => setActiveTab('en_vivo')}
+              onClick={() => navigateTo('en_vivo')}
               class={`flex-1 flex flex-col items-center justify-center transition-all duration-200 ${
-                activeTab === 'en_vivo' ? 'text-red-500 scale-105' : 'text-white/40 hover:text-white/80'
+                activeTab === 'en_vivo' ? 'text-red-500 scale-105' : 'text-white/40 hover:text-white/60'
               }`}
             >
               <div class="relative">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.3" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.893L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
                 </svg>
                 <span class="absolute -top-1 -right-1 flex h-2 w-2">
                   <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                   <span class="relative inline-flex rounded-full h-2 w-2 bg-red-600"></span>
                 </span>
               </div>
-              <span class="text-[10px] font-bold tracking-widest font-title uppercase mt-1">EN VIVO</span>
+              <span class="text-[9px] font-extrabold tracking-widest font-title uppercase mt-1">EN VIVO</span>
             </button>
 
             <button 
-              onClick={() => setActiveTab('canales')}
+              onClick={() => navigateTo('canales')}
               class={`flex-1 flex flex-col items-center justify-center transition-all duration-200 ${
-                activeTab === 'canales' ? 'text-brandGold scale-105' : 'text-white/40 hover:text-white/80'
+                activeTab === 'canales' ? 'text-brandGold scale-105' : 'text-white/40 hover:text-white/60'
               }`}
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.3" d="M7 4V20M17 4V20M3 8h18M3 16h18" />
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
               </svg>
-              <span class="text-[10px] font-bold tracking-widest font-title uppercase mt-1">CANALES</span>
+              <span class="text-[9px] font-extrabold tracking-widest font-title uppercase mt-1">CANALES</span>
             </button>
 
             <button 
-              onClick={() => setActiveTab('peliculas')}
+              onClick={() => navigateTo('peliculas')}
               class={`flex-1 flex flex-col items-center justify-center transition-all duration-200 ${
-                activeTab === 'peliculas' ? 'text-brandPurple scale-105' : 'text-white/40 hover:text-white/80'
+                activeTab === 'peliculas' ? 'text-brandPurple scale-105' : 'text-white/40 hover:text-white/60'
               }`}
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.3" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 20.25h12m-7.5-3v3m3-3v3m-10.125-3h14.25c.621 0 1.125-.504 1.125-1.125V4.875c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125z" />
               </svg>
-              <span class="text-[10px] font-bold tracking-widest font-title uppercase mt-1">PELÍCULAS</span>
+              <span class="text-[9px] font-extrabold tracking-widest font-title uppercase mt-1">PELÍCULAS</span>
             </button>
 
-            {/* Hidden Player Activator tab */}
-            {currentStream && (
-              <button 
-                onClick={() => setActiveTab('reproductor')}
-                class={`flex-1 flex flex-col items-center justify-center transition-all duration-200 ${
-                  activeTab === 'reproductor' ? 'text-brandGold scale-105' : 'text-white/40 hover:text-white/80'
-                }`}
-              >
-                <div class="bg-brandPurple/20 border border-brandPurple/30 p-1.5 rounded-full text-brandPurple">
-                  <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z"/>
-                  </svg>
-                </div>
-                <span class="text-[10px] font-bold tracking-widest font-title uppercase mt-0.5">REPRODUCTOR</span>
-              </button>
-            )}
+            <button 
+              onClick={() => navigateTo('grabaciones')}
+              class={`flex-1 flex flex-col items-center justify-center transition-all duration-200 ${
+                activeTab === 'grabaciones' ? 'text-[#a78bfa] scale-105' : 'text-white/40 hover:text-white/60'
+              }`}
+            >
+              <div class="relative">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {recordings.length > 0 && (
+                  <span class="absolute -top-1 -right-1 bg-brandPurple text-[7px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center text-white border border-black animate-pulse">
+                    {recordings.length}
+                  </span>
+                )}
+              </div>
+              <span class="text-[9px] font-extrabold tracking-widest font-title uppercase mt-1">GRABACIONES</span>
+            </button>
 
           </nav>
-
         </div>
       );
     }
 
-    // High performance VideoPlayer Component
-    function VideoPlayer({ stream, onShowToast, onRecordingAdded }) {
+    // Component: Core Custom HTML5 Media & HLS player container
+    function VideoPlayer({ stream, triggerToast, onClosing, onRecordingAdded }) {
       const videoRef = useRef(null);
-      const containerRef = useRef(null);
-
-      const [isPlaying, setIsPlaying] = useState(false);
-      const [isMuted, setIsMuted] = useState(false);
-      const [volume, setVolume] = useState(0.85);
-      const [videoProgress, setVideoProgress] = useState(0);
-      const [videoDuration, setVideoDuration] = useState(0);
-      const [showReportModal, setShowReportModal] = useState(false);
-
-      // Media Quality & levels tracking
+      const playerContainerRef = useRef(null);
+      
+      const [playing, setPlaying] = useState(false);
+      const [currentTime, setCurrentTime] = useState(0);
+      const [duration, setDuration] = useState(0);
+      const [volume, setVolume] = useState(1);
+      const [muted, setMuted] = useState(false);
+      const [fullscreen, setFullscreen] = useState(false);
+      
       const [qualities, setQualities] = useState([]);
-      const [currentQualityIdx, setCurrentQualityIdx] = useState(-1); // -1 = Auto
-      const [showQualityMenu, setShowQualityMenu] = useState(false);
+      const [selectedQuality, setSelectedQuality] = useState(-1);
+      const [isQualityOpen, setIsQualityOpen] = useState(false);
 
-      // Recording Tracking
+      const [playbackError, setPlaybackError] = useState(null);
+      const [isConnecting, setIsConnecting] = useState(true);
+      const [reportModalOpen, setReportModalOpen] = useState(false);
+
+      // Recording logic parameters
       const [isRecording, setIsRecording] = useState(false);
-      const [recordSeconds, setRecordSeconds] = useState(0);
-
+      const [recordingSeconds, setRecordingSeconds] = useState(0);
       const mediaRecorderRef = useRef(null);
-      const recordingChunksRef = useRef([]);
-      const timerRef = useRef(null);
+      const recordedChunksRef = useRef([]);
+      const recordingTimerRef = useRef(null);
+
       const hlsRef = useRef(null);
+      const retryAttemptsRef = useRef(0);
+      const maxRetryAttempts = 3;
 
-      // Report checked types
-      const [reportChecked, setReportChecked] = useState({
-        noImg: false,
-        noSnd: false,
-        noBuff: false,
-        noStrm: false
-      });
-      const [reportMsg, setReportMsg] = useState('');
-
-      // Auto Retry loading logic parameters
-      const retryCountRef = useRef(0);
-      const maxRetries = 4;
-
-      // Handle stream resolution & playback bindings
-      useEffect(() => {
-        const video = videoRef.current;
-        if (!video || !stream.stream_url) return;
-
-        // Reset variables
-        retryCountRef.current = 0;
+      // Sintonizador de señal - Cascading Fallback (Safari direct m3u8 VS Hls.js VS Error handler)
+      const initPlayer = () => {
+        setIsConnecting(true);
+        setPlaybackError(null);
         setQualities([]);
-        setCurrentQualityIdx(-1);
-        setIsPlaying(false);
+        setSelectedQuality(-1);
+        setIsQualityOpen(false);
 
-        // Standard direct HTML5 playback for recordings or VOD mp4 files if no .m3u8 extension
-        const isHls = stream.stream_url.includes('.m3u8') || stream.stream_url.includes('php?');
+        const video = videoRef.current;
+        if (!video) return;
 
-        if (isHls && Hls.isSupported()) {
-          if (hlsRef.current) {
-            hlsRef.current.destroy();
-          }
+        // Reset any previous hls instance
+        if (hlsRef.current) {
+          hlsRef.current.destroy();
+          hlsRef.current = null;
+        }
 
+        const sourceUrl = stream.stream_url;
+
+        // Fallback Cascading 1: Native iOS Safari browser support
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = sourceUrl;
+          video.addEventListener('loadedmetadata', onLoadedMetadata);
+          video.addEventListener('error', handleNativeVideoError);
+        } 
+        // Fallback Cascading 2: Standard desktop Chrome / Android System WebView using hls.js
+        else if (Hls.isSupported()) {
           const hls = new Hls({
-            maxMaxBufferLength: 10,
-            enableSoftwareAES: true,
-            manifestLoadingMaxRetry: 4,
-            manifestLoadingRetryDelay: 1000
+            enableWorker: true,
+            lowLatencyMode: true,
+            backBufferLength: 90,
+            xhrSetup: (xhr, url) => {
+              xhr.withCredentials = false;
+            }
           });
-          hlsRef.current = hls;
 
-          hls.loadSource(stream.stream_url);
+          hlsRef.current = hls;
+          hls.loadSource(sourceUrl);
           hls.attachMedia(video);
 
-          // Quality parsing hooks
-          hls.on(Hls.Events.MANIFEST_PARSED, (e, data) => {
-            if (hls.levels && hls.levels.length > 1) {
-              setQualities(hls.levels);
+          // Handle level selections (quality selector) ONLY if multiple are declared inside index file
+          hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+            setIsConnecting(false);
+            if (data.levels && data.levels.length > 1) {
+              setQualities(data.levels);
+              setSelectedQuality(hls.currentLevel);
             }
-            video.play()
-              .then(() => setIsPlaying(true))
-              .catch(() => setIsPlaying(false));
           });
 
-          // Custom Auto Reconnect Retry Algorithm
+          hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+            setSelectedQuality(data.level);
+          });
+
+          // Fallback Cascading 3: Error management & recoverMediaError routine
           hls.on(Hls.Events.ERROR, (event, data) => {
             if (data.fatal) {
-              switch (data.type) {
-                case Hls.ErrorTypes.NETWORK_ERROR:
-                  console.error("Fatal network error in HLS streaming:", data);
-                  if (retryCountRef.current < maxRetries) {
-                    retryCountRef.current++;
-                    onShowToast(`Reconectando transmisión en vivo (${retryCountRef.current}/${maxRetries})...`);
+              console.warn('Fatal HLS content load error detected:', data.type);
+              if (retryAttemptsRef.current < maxRetryAttempts) {
+                retryAttemptsRef.current++;
+                console.log(`Auto recover attempt ${retryAttemptsRef.current}...`);
+                
+                switch (data.type) {
+                  case Hls.ErrorTypes.MEDIA_ERROR:
+                    hls.recoverMediaError();
+                    break;
+                  default:
                     hls.startLoad();
-                  } else {
-                    onShowToast("La transmisión en vivo se cayó. Intente recargar.");
-                  }
-                  break;
-                case Hls.ErrorTypes.MEDIA_ERROR:
-                  console.error("Fatal media error, attempting error recovery:", data);
-                  hls.recoverMediaError();
-                  break;
-                default:
-                  console.error("HLS unrecoverable error:", data);
-                  if (hlsRef.current) hlsRef.current.destroy();
-                  break;
+                    break;
+                }
+              } else {
+                // If exceeded attempt limit, trigger display
+                setPlaybackError('Stream no disponible. Intenta más tarde.');
+                setIsConnecting(false);
               }
             }
           });
-
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-          // Native Safari / MacOS fallback inside WebView
-          video.src = stream.stream_url;
-          video.addEventListener('loadedmetadata', () => {
-            video.play()
-              .then(() => setIsPlaying(true))
-              .catch(() => setIsPlaying(false));
-          });
-        } else {
-          // Standard MP4 placeholder file or webm recording
-          video.src = stream.stream_url;
-          video.addEventListener('loadedmetadata', () => {
-            video.play()
-              .then(() => setIsPlaying(true))
-              .catch(() => setIsPlaying(false));
-          });
         }
+        else {
+          // No stream player formats supported fallback
+          setPlaybackError('Plataforma no soporta streaming multimedia hls.');
+          setIsConnecting(false);
+        }
+      };
 
-        // Listen for time bounds
-        const updateProgress = () => {
-          setVideoProgress(video.currentTime);
-          setVideoDuration(video.duration || 0);
-        };
+      const handleNativeVideoError = () => {
+        if (retryAttemptsRef.current < maxRetryAttempts) {
+          retryAttemptsRef.current++;
+          setTimeout(initPlayer, 1500);
+        } else {
+          setPlaybackError('Stream no disponible. Intenta más tarde.');
+          setIsConnecting(false);
+        }
+      };
 
-        video.addEventListener('timeupdate', updateProgress);
-        video.addEventListener('durationchange', updateProgress);
+      const onLoadedMetadata = () => {
+        setIsConnecting(false);
+        setDuration(videoRef.current.duration || 0);
+      };
+
+      useEffect(() => {
+        retryAttemptsRef.current = 0;
+        initPlayer();
 
         return () => {
           if (hlsRef.current) {
             hlsRef.current.destroy();
           }
-          video.removeEventListener('timeupdate', updateProgress);
-          video.removeEventListener('durationchange', updateProgress);
-          
-          // Stop recording timer if unmounted
-          if (timerRef.current) clearInterval(timerRef.current);
+          stopRecordingTimer();
         };
       }, [stream.stream_url]);
 
-      // Play & Pause
+      // Fullscreen state listener checks conforming to Correction #1
+      useEffect(() => {
+        const handleFullscreenChange = () => {
+          const isCurrentlyFs = !!(
+            document.fullscreenElement ||
+            document.webkitFullscreenElement ||
+            document.mozFullScreenElement ||
+            document.msFullscreenElement
+          );
+          setFullscreen(isCurrentlyFs);
+        };
+
+        const container = playerContainerRef.current;
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('msfullscreenchange', handleFullscreenChange);
+
+        return () => {
+          document.removeEventListener('fullscreenchange', handleFullscreenChange);
+          document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+          document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+          document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+        };
+      }, []);
+
+      // Toggle Playback controls
       const togglePlay = () => {
         const video = videoRef.current;
         if (!video) return;
 
-        if (isPlaying) {
+        if (playing) {
           video.pause();
-          setIsPlaying(false);
+          setPlaying(false);
         } else {
-          video.play()
-            .then(() => setIsPlaying(true))
-            .catch(e => console.error(e));
+          video.play().then(() => {
+            setPlaying(true);
+          }).catch(() => {
+            setPlaying(false);
+          });
         }
       };
 
-      // Mute / Unmute
-      const toggleMute = () => {
-        const video = videoRef.current;
-        if (!video) return;
-
-        video.muted = !isMuted;
-        setIsMuted(!isMuted);
+      // Progress Tracker
+      const handleTimeUpdate = () => {
+        if (!videoRef.current) return;
+        setCurrentTime(videoRef.current.currentTime);
       };
 
-      // Volume change
+      const handleSeek = (e) => {
+        const video = videoRef.current;
+        if (!video || !duration || duration === Infinity) return;
+        const seekValue = parseFloat(e.target.value);
+        video.currentTime = seekValue;
+        setCurrentTime(seekValue);
+      };
+
       const handleVolumeChange = (e) => {
-        const value = parseFloat(e.target.value);
-        const video = videoRef.current;
-        if (!video) return;
+        const val = parseFloat(e.target.value);
+        setVolume(val);
+        if (videoRef.current) {
+          videoRef.current.volume = val;
+          videoRef.current.muted = val === 0;
+        }
+        setMuted(val === 0);
+      };
 
-        setVolume(value);
-        video.volume = value;
-        if (value === 0) {
-          video.muted = true;
-          setIsMuted(true);
-        } else {
-          video.muted = false;
-          setIsMuted(false);
+      const toggleMute = () => {
+        const nextMute = !muted;
+        setMuted(nextMute);
+        if (videoRef.current) {
+          videoRef.current.muted = nextMute;
         }
       };
 
-      // Quality selector level modifier
-      const changeQualityLevel = (idx) => {
-        if (!hlsRef.current) return;
-        hlsRef.current.currentLevel = idx;
-        setCurrentQualityIdx(idx);
-        setShowQualityMenu(false);
+      // Fullscreen cascading browser triggers
+      const enterFullscreen = () => {
+        const el = playerContainerRef.current;
+        if (!el) return;
+
+        if (el.requestFullscreen) el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
+        else if (el.msRequestFullscreen) el.msRequestFullscreen();
+        else {
+          // iOS visual fallback
+          el.classList.add('fixed', 'inset-0', 'w-screen', 'h-screen', 'z-[9999]', 'bg-black');
+          setFullscreen(true);
+        }
+      };
+
+      const exitFullscreen = () => {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+        else if (document.msExitFullscreen) document.msExitFullscreen();
         
-        const label = idx === -1 ? 'Automática' : `${hlsRef.current.levels[idx].height}p`;
-        onShowToast(`Calidad ajustada a: ${label}`);
+        // Remove iOS fallback classes
+        const el = playerContainerRef.current;
+        if (el) {
+          el.classList.remove('fixed', 'inset-0', 'w-screen', 'h-screen', 'z-[9999]', 'bg-black');
+        }
+        setFullscreen(false);
       };
 
-      // Seek timeline position for VOD content
-      const handleSeekProgressBar = (e) => {
-        const video = videoRef.current;
-        if (!video) return;
-        const seekTime = parseFloat(e.target.value);
-        video.currentTime = seekTime;
-        setVideoProgress(seekTime);
-      };
-
-      // Fullscreen view toggle
       const toggleFullscreen = () => {
-        const container = containerRef.current;
-        if (!container) return;
-
-        if (!document.fullscreenElement) {
-          container.requestFullscreen()
-            .catch(err => {
-              onShowToast('Error al activar pantalla completa.');
-            });
+        if (fullscreen) {
+          exitFullscreen();
         } else {
-          document.exitFullscreen();
+          enterFullscreen();
         }
       };
 
-      // format seconds to timer view: mm:ss
-      const formatTime = (sec) => {
-        if (isNaN(sec) || !isFinite(sec)) return "00:00";
-        const m = Math.floor(sec / 60).toString().padStart(2, '0');
-        const s = Math.floor(sec % 60).toString().padStart(2, '0');
+      // Change Quality trigger
+      const changeLevel = (levelIndex) => {
+        if (hlsRef.current) {
+          hlsRef.current.currentLevel = levelIndex;
+        }
+        setIsQualityOpen(false);
+      };
+
+      // Native WebApp share integration
+      const handleShare = () => {
+        const descText = `Mira ${stream.title} en vivo en Videx App gratis! 🔗 ${stream.stream_url}`;
+        if (window.AndroidInterface && window.AndroidInterface.shareContent) {
+          window.AndroidInterface.shareContent(descText);
+        } else {
+          // Standard browser copy link fallback
+          navigator.clipboard.writeText(descText).then(() => {
+            triggerToast('Enlace descriptivo copiado al portapapeles!');
+          }).catch(() => {
+            triggerToast('Error al copiar el enlace.');
+          });
+        }
+      };
+
+      // Format seconds beautifully helper
+      const formatTime = (secs) => {
+        if (isNaN(secs) || secs === Infinity) return "LIVE";
+        const m = Math.floor(secs / 60).toString().padStart(2, '0');
+        const s = Math.floor(secs % 60).toString().padStart(2, '0');
         return `${m}:${s}`;
       };
 
-      // SEND PROBLEM REPORT
-      const handleSendReport = (e) => {
-        e.preventDefault();
-        setShowReportModal(false);
-        // Toast callback
-        onShowToast('⚠️ Reporte enviado con éxito. Nuestro equipo técnico validará la señal.');
-        // reset checked states
-        setReportChecked({ noImg: false, noSnd: false, noBuff: false, noStrm: false });
-        setReportMsg('');
+      const formatCounter = (totalSecs) => {
+        const hrs = Math.floor(totalSecs / 3600).toString().padStart(2, '0');
+        const mins = Math.floor((totalSecs % 3600) / 60).toString().padStart(2, '0');
+        const secs = Math.floor(totalSecs % 60).toString().padStart(2, '0');
+        return `${hrs}:${mins}:${secs}`;
       };
 
-      // CAPTURE RECORDINGS - MediaRecorder
-      const startRecordingStream = () => {
+      // Capturing recorder logic conforming to Correction #4
+      const startRecording = () => {
         const video = videoRef.current;
         if (!video) return;
 
-        recordingChunksRef.current = [];
-        let captureStream = null;
-
-        // browser capture compatibility
-        if (typeof video.captureStream === 'function') {
-          captureStream = video.captureStream(25);
-        } else if (typeof video.mozCaptureStream === 'function') {
-          captureStream = video.mozCaptureStream(25);
-        } else {
-          onShowToast('La grabación no es soportada por este reproductor.');
-          return;
-        }
-
         try {
-          const options = { mimeType: 'video/webm;codecs=vp9' };
-          mediaRecorderRef.current = new MediaRecorder(captureStream, options);
-        } catch (e) {
-          mediaRecorderRef.current = new MediaRecorder(captureStream, { mimeType: 'video/webm' });
-        }
-
-        mediaRecorderRef.current.ondataavailable = (event) => {
-          if (event.data && event.data.size > 0) {
-            recordingChunksRef.current.push(event.data);
+          recordedChunksRef.current = [];
+          
+          let streamObj;
+          if (video.captureStream) {
+            streamObj = video.captureStream();
+          } else if (video.mozCaptureStream) {
+            streamObj = video.mozCaptureStream();
+          } else {
+            triggerToast('Tu navegador no soporta captura y grabación del reproductor.');
+            return;
           }
-        };
 
-        mediaRecorderRef.current.onstop = () => {
-          const blob = new Blob(recordingChunksRef.current, { type: 'video/webm' });
-          const streamDurationStr = formatTime(recordSeconds);
+          const options = { mimeType: 'video/webm;codecs=vp8,opus' };
+          let recorder;
+          try {
+            recorder = new MediaRecorder(streamObj, options);
+          } catch (e) {
+            recorder = new MediaRecorder(streamObj);
+          }
 
-          const fileReader = new FileReader();
-          fileReader.readAsDataURL(blob);
-          fileReader.onloadend = () => {
-            const base64Content = fileReader.result.split(',')[1];
-            const fileName = `videx_${Date.now()}.webm`;
+          mediaRecorderRef.current = recorder;
 
-            // Bridge to native downloads
-            if (window.AndroidInterface && window.AndroidInterface.saveRecording) {
-              window.AndroidInterface.saveRecording(base64Content, fileName);
-            } else {
-              // fallback native browser download anchors
-              const blobUrl = URL.createObjectURL(blob);
-              const anchor = document.createElement('a');
-              anchor.href = blobUrl;
-              anchor.download = fileName;
-              anchor.click();
-            }
-
-            // Save details log to history localstorage
-            try {
-              const currentRecs = JSON.parse(localStorage.getItem('videx_recordings') || '[]');
-              const newRec = {
-                id: Date.now().toString(),
-                name: stream.title || 'Señal en Vivo',
-                date: new Date().toLocaleString(),
-                duration: streamDurationStr,
-                url: URL.createObjectURL(blob) // Active objectURL reference for current session preview
-              };
-              currentRecs.unshift(newRec); // Prepend to top
-              localStorage.setItem('videx_recordings', JSON.stringify(currentRecs));
-              onRecordingAdded(); // update state in App view
-            } catch (err) {
-              console.error(err);
+          recorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) {
+              recordedChunksRef.current.push(event.data);
             }
           };
 
-          setRecordSeconds(0);
-        };
+          recorder.onstop = () => {
+            const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+            const fileName = `videx_rec_${Date.now()}.webm`;
+            const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
+            const durFormatted = formatCounter(recordingSeconds);
 
-        // Start Recording and initialize timer
-        mediaRecorderRef.current.start(1000);
-        setIsRecording(true);
-        setRecordSeconds(0);
-        
-        timerRef.current = setInterval(() => {
-          setRecordSeconds(prev => prev + 1);
+            // Convert to base64 to leverage native bridge or fallback matching
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = () => {
+              const base64Content = reader.result.split(',')[1];
+              
+              if (window.AndroidInterface && window.AndroidInterface.saveRecording) {
+                window.AndroidInterface.saveRecording(base64Content, fileName);
+              } else {
+                // Browser testing fallback downloads
+                const blobUrl = URL.createObjectURL(blob);
+                const tag = document.createElement('a');
+                tag.href = blobUrl;
+                tag.download = fileName;
+                tag.click();
+                triggerToast('Grabación descargada en el dispositivo.');
+              }
+
+              // Update localStorage catalog database listing conform to Correction #4
+              const currentList = JSON.parse(localStorage.getItem('videx_recordings') || '[]');
+              const blobUrlLocal = URL.createObjectURL(blob); // available temporary for this tab session only
+              
+              const newReg = {
+                id: Date.now().toString(),
+                titulo: stream.title,
+                fecha: nowStr,
+                duracion: durFormatted,
+                nombreArchivo: fileName,
+                blobUrl: blobUrlLocal
+              };
+
+              currentList.unshift(newReg);
+              localStorage.setItem('videx_recordings', JSON.stringify(currentList));
+              
+              // Callback update
+              if (onRecordingAdded) onRecordingAdded();
+            };
+          };
+
+          recorder.start(1000); // chunk slices
+          setIsRecording(true);
+          setRecordingSeconds(0);
+          
+          startRecordingTimer();
+          triggerToast('Comenzó la grabación de la transmisión.');
+        } catch (err) {
+          console.error(err);
+          triggerToast('Error al inicializar captura multimedia.');
+        }
+      };
+
+      const startRecordingTimer = () => {
+        stopRecordingTimer();
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingSeconds(prev => prev + 1);
         }, 1000);
-
-        onShowToast('⏺ Grabación de transmisión iniciada.');
       };
 
-      const stopRecordingStream = () => {
-        if (!mediaRecorderRef.current) return;
-        
-        mediaRecorderRef.current.stop();
-        setIsRecording(false);
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-        }
-        onShowToast('⏹ Grabación detenida. Procesando archivo...');
-      };
-
-      // Native style navigator sharing fallback
-      const handleShareMedia = () => {
-        const textToShare = `Mira la transmisión en vivo de "${stream.title}" en VIDEX APP. Señal HLS: ${stream.stream_url}`;
-        if (window.AndroidInterface && window.AndroidInterface.shareContent) {
-          window.AndroidInterface.shareContent(textToShare);
-        } else if (navigator.share) {
-          navigator.share({
-            title: 'VIDEX APP',
-            text: textToShare,
-            url: window.location.href
-          })
-          .catch(e => console.error(e));
-        } else {
-          // copy string to clipboard
-          navigator.clipboard.writeText(textToShare)
-            .then(() => onShowToast('↗ ¡Enlace descriptivo del contenido copiado al portapapeles!'))
-            .catch(() => onShowToast('No se pudo copiar el enlace.'));
+      const stopRecordingTimer = () => {
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
         }
       };
 
-      // Determine VOD vs Live
-      const isLive = stream.type === 'live' || stream.type === 'channel';
+      const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+          mediaRecorderRef.current.stop();
+          setIsRecording(false);
+          stopRecordingTimer();
+          triggerToast('Procesando y guardando archivo...');
+        }
+      };
 
       return (
         <div class="space-y-4">
           
-          {/* Main Visual Player Surface Frame */}
+          {/* Main player box containing HTML5 Canvas / Video elements and custom bar overlay */}
           <div 
-            ref={containerRef}
-            class="relative aspect-video w-full bg-[#000000] rounded-xl overflow-hidden border border-white/5 shadow-2xl flex flex-col justify-between group"
+            ref={playerContainerRef} 
+            class={`relative bg-black rounded-2xl overflow-hidden aspect-video border border-white/10 group flex flex-col justify-between ${
+              fullscreen ? 'w-screen h-screen rounded-none' : ''
+            }`}
           >
-            {/* Native Video element tag */}
+            {/* Native Video Element */}
             <video 
               ref={videoRef}
-              playsInline
-              class="w-full h-full object-contain cursor-pointer"
               onClick={togglePlay}
+              onTimeUpdate={handleTimeUpdate}
+              class="w-full h-full object-contain cursor-pointer flex-grow"
+              playsInline
+              webkit-playsinline="true"
             />
 
-            {/* Custom Control Bar Overlay */}
-            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-4 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-300 flex flex-col gap-3">
+            {/* Connecting view spinner */}
+            {isConnecting && (
+              <div class="absolute inset-0 bg-[#0a0a0f]/90 z-10 flex flex-col items-center justify-center space-y-2">
+                <div class="w-8 h-8 border-3 border-brandGold border-t-transparent rounded-full animate-spin"></div>
+                <p class="text-xs text-white/40 tracking-widest font-title uppercase">Sintonizando Señal...</p>
+              </div>
+            )}
+
+            {/* Playback Errors visual feedback */}
+            {playbackError && (
+              <div class="absolute inset-0 bg-[#0c0c12]/95 z-10 flex flex-col items-center justify-center p-6 text-center">
+                <p class="text-xs text-red-400 font-bold mb-3 uppercase tracking-wider">⚠️ Sintonización Fallida</p>
+                <p class="text-sm text-white/80 max-w-sm mb-4">{playbackError}</p>
+                <button 
+                  onClick={initPlayer}
+                  class="bg-brandGold text-black font-extrabold text-xs px-4 py-2 rounded-xl hover:bg-brandGold/90 transition shadow-lg shadow-brandGold/15"
+                >
+                  REINTENTAR SINTONIZACIÓN
+                </button>
+              </div>
+            )}
+
+            {/* Recorder current counter feedback top left banner */}
+            {isRecording && (
+              <div class="absolute top-4 left-4 z-20 flex items-center space-x-1.5 bg-red-600 border border-red-500 text-[10px] font-black tracking-widest uppercase text-white px-2.5 py-1 rounded-full live-pulse shadow">
+                <span class="w-1.5 h-1.5 bg-white rounded-full"></span>
+                <span>REC {formatCounter(recordingSeconds)}</span>
+              </div>
+            )}
+
+            {/* CUSTOM PLAYER BAR OVERLAY (Hidden in normal, shown on mouse overlay or always touch elements) */}
+            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent p-3 pt-6 flex flex-col space-y-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition duration-300 z-10">
               
-              {/* Top seek Timeline / Status */}
-              <div class="flex items-center space-x-3 w-full">
-                {isLive ? (
-                  <div class="flex items-center space-x-2">
-                    <span class="w-2.5 h-2.5 bg-red-600 rounded-full custom-pulse"></span>
-                    <span class="text-xs font-bold text-white uppercase tracking-wider">● TRANSMISIÓN EN DIRECTO</span>
+              {/* VOD Progress bar controller vs LIVE status Indicator */}
+              <div class="flex items-center space-x-2 pb-1.5">
+                {duration && duration !== Infinity ? (
+                  <div class="flex items-center space-x-2 w-full">
+                    <span class="text-[10px] font-semibold text-white/60">{formatTime(currentTime)}</span>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max={duration || 100} 
+                      step="0.1"
+                      value={currentTime}
+                      onChange={handleSeek}
+                      class="flex-grow accent-brandGold h-1 rounded bg-white/20 outline-none cursor-pointer"
+                    />
+                    <span class="text-[10px] font-semibold text-white/60">{formatTime(duration)}</span>
                   </div>
                 ) : (
-                  <div class="flex items-center space-x-2 w-full text-xs text-white">
-                    <span>{formatTime(videoProgress)}</span>
-                    <input 
-                      type="range"
-                      min="0"
-                      max={videoDuration || 100}
-                      step="0.1"
-                      value={videoProgress}
-                      onChange={handleSeekProgressBar}
-                      class="flex-grow accent-brandGold bg-white/20 h-1.5 rounded-lg outline-none cursor-pointer"
-                    />
-                    <span>{formatTime(videoDuration)}</span>
+                  <div class="flex items-center space-x-1.5 py-1 px-2.5 rounded-full bg-red-600/25 border border-red-500/20">
+                    <span class="w-2 h-2 bg-red-500 rounded-full live-pulse"></span>
+                    <span class="text-[9px] font-black uppercase text-red-500 tracking-widest leading-none">SEÑAL EN VIVO</span>
                   </div>
                 )}
               </div>
 
-              {/* Action Buttons panel row */}
+              {/* Core controls */}
               <div class="flex items-center justify-between">
                 
-                {/* Left controls panel */}
+                {/* Play / Close container */}
                 <div class="flex items-center space-x-3">
-                  <button onClick={togglePlay} class="text-white hover:text-brandGold transition p-1.5" title={isPlaying ? "Pausa" : "Play"}>
-                    {isPlaying ? (
-                      <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                  <button onClick={togglePlay} class="text-white hover:text-brandGold transition p-1" title="Reproducir/Pausar">
+                    {playing ? (
+                      <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
                         <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
                       </svg>
                     ) : (
-                      <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                      <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
                         <path d="M8 5v14l11-7z"/>
                       </svg>
                     )}
                   </button>
 
-                  {/* Volume Slider overlay buttons */}
-                  <div class="flex items-center space-x-1.5 group/volume">
-                    <button onClick={toggleMute} class="text-white hover:text-brandGold transition p-1.5">
-                      {isMuted ? (
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                  {/* Volume Slider controller */}
+                  <div class="flex items-center space-x-1.5 group/vol">
+                    <button onClick={toggleMute} class="text-white hover:text-brandGold transition p-1">
+                      {muted || volume === 0 ? (
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6L4.5 9H1.5v6h3l4.5 3.75V3.75z" />
                         </svg>
                       ) : (
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M12 18.75V5.25L7.75 9.5H4.5v5h3.25L12 18.75z" />
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                         </svg>
                       )}
                     </button>
+                    
                     <input 
-                      type="range"
-                      min="0"
-                      max="1"
+                      type="range" 
+                      min="0" 
+                      max="1" 
                       step="0.05"
-                      value={isMuted ? 0 : volume}
+                      value={muted ? 0 : volume}
                       onChange={handleVolumeChange}
-                      class="w-16 accent-brandGold h-1 bg-white/20 rounded-lg outline-none cursor-pointer"
+                      class="w-16 accent-white h-0.5 rounded cursor-pointer hidden sm:block opacity-0 group-hover/vol:opacity-100 transition-opacity"
                     />
                   </div>
+                </div>
 
-                  {/* Hls.js level selector if exists */}
+                {/* Sub features bar (Quality, Save, Share, Report, FullScreen) */}
+                <div class="flex items-center space-x-2.5">
+                  
+                  {/* Quality levels selector - ONLY if playlist contains multiple configurations conform to Rule #3 */}
                   {qualities.length > 0 && (
                     <div class="relative">
                       <button 
-                        onClick={() => setShowQualityMenu(!showQualityMenu)}
-                        class="bg-black/60 border border-white/10 hover:border-brandGold transition px-2 py-1 rounded text-[10px] font-bold uppercase text-white flex items-center space-x-1"
+                        onClick={() => setIsQualityOpen(!isQualityOpen)}
+                        class="text-[10px] font-bold bg-white/10 hover:bg-[#1a1a26] border border-white/10 px-2 py-1 rounded text-white active:scale-95 transition"
                       >
-                        <span>{currentQualityIdx === -1 ? 'AUTO' : `${qualities[currentQualityIdx].height}p`}</span>
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
+                        ⚙️ {selectedQuality === -1 ? 'AUTO' : `${qualities[selectedQuality].height}P`}
                       </button>
 
-                      {showQualityMenu && (
-                        <div class="absolute bottom-8 left-0 bg-[#12121a] border border-white/10 rounded-lg shadow-xl py-1 min-w-[100px] z-50">
+                      {isQualityOpen && (
+                        <div class="absolute bottom-full right-0 mb-2 bg-[#0c0c12] border border-white/10 rounded-xl p-1.5 shadow-2xl flex flex-col space-y-1 min-w-[100px] z-[99]">
                           <button 
-                            onClick={() => changeQualityLevel(-1)}
-                            class={`w-full text-left px-3 py-1 text-xs hover:bg-brandPurple/20 transition ${currentQualityIdx === -1 ? 'text-brandGold font-bold' : 'text-white/70'}`}
+                            onClick={() => changeLevel(-1)}
+                            class={`text-left text-[9px] font-bold px-2 py-1 rounded transition uppercase ${
+                              selectedQuality === -1 ? 'text-brandGold bg-brandGold/10' : 'text-white/60 hover:bg-white/5'
+                            }`}
                           >
-                            Automático
+                            AUTOMÁTICO
                           </button>
-                          {qualities.map((q, idx) => (
+                          {qualities.map((item, idx) => (
                             <button
                               key={idx}
-                              onClick={() => changeQualityLevel(idx)}
-                              class={`w-full text-left px-3 py-1 text-xs hover:bg-brandPurple/20 transition ${currentQualityIdx === idx ? 'text-brandGold font-bold' : 'text-white/70'}`}
+                              onClick={() => changeLevel(idx)}
+                              class={`text-left text-[9px] font-bold px-2 py-1 rounded transition ${
+                                selectedQuality === idx ? 'text-brandGold bg-brandGold/10' : 'text-white/60 hover:bg-white/5'
+                              }`}
                             >
-                              {q.height}p ({Math.round(q.bitrate / 1000)}k)
+                              {item.height}P ({Math.round(item.bitrate / 1000)}kbps)
                             </button>
                           ))}
                         </div>
                       )}
                     </div>
                   )}
-                </div>
 
-                {/* Right controls panel */}
-                <div class="flex items-center space-x-2">
-                  
-                  {/* MediaRecorder Button option */}
-                  {isLive && (
-                    <button 
-                      onClick={isRecording ? stopRecordingStream : startRecordingStream}
-                      class={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition ${
-                        isRecording 
-                          ? 'bg-red-600 border border-red-500 text-white animate-pulse' 
-                          : 'bg-white/10 hover:bg-white/20 text-white'
-                      }`}
-                    >
-                      <span class={`w-2 h-2 rounded-full ${isRecording ? 'bg-white custom-pulse' : 'bg-red-600'}`}></span>
-                      <span>{isRecording ? `REC ${formatTime(recordSeconds)}` : 'GRABAR'}</span>
-                    </button>
+                  {/* Detener vs Comienza Grabar conform to Correction #4 */}
+                  {stream.type !== 'recorded' && (
+                    isRecording ? (
+                      <button 
+                        onClick={stopRecording}
+                        class="bg-red-600 border border-red-500 text-white p-1 rounded-lg hover:scale-105 transition"
+                        title="Detener Grabación"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
+                        </svg>
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={startRecording}
+                        class="bg-white/10 hover:bg-white/20 text-white p-1.5 rounded-lg active:scale-95 transition"
+                        title="Capturar/Grabar Transmisión"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6.75 6.75 0 100-13.5 6.75 6.75 0 000 13.5z" />
+                        </svg>
+                      </button>
+                    )
                   )}
 
-                  {/* Share stream details */}
-                  <button onClick={handleShareMedia} class="text-white hover:text-brandGold transition p-1.5" title="Compartir">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 10.742l4.622-2.31M15.316 11.258l-4.623 2.31M16 12a3 3 0 11-6 0 3 3 0 016 0zm-6-4H5a3 3 0 11-1.316 4.742m1.316-4.742L8.684 8.74m0 4.52l4.622 2.31M15.316 12.758a3 3 0 116 0 3 3 0 01-6 0z" />
+                  {/* Share button banner */}
+                  <button onClick={handleShare} class="bg-white/10 hover:bg-white/20 text-white p-1.5 rounded-lg transition" title="Compartir Señal">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
                     </svg>
                   </button>
 
-                  {/* Report signal problem modal button */}
-                  <button 
-                    onClick={() => setShowReportModal(true)}
-                    class="text-white hover:text-red-500 transition p-1.5"
-                    title="Reportar canal"
-                  >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  {/* Report option */}
+                  <button onClick={() => setReportModalOpen(true)} class="bg-white/10 hover:bg-white/20 text-white p-1.5 rounded-lg transition" title="Reportar Falla">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                     </svg>
                   </button>
 
-                  <button onClick={toggleFullscreen} class="text-white hover:text-brandGold transition p-1.5" title="Pantalla Completa">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-                    </svg>
+                  {/* FullScreen button triggers */}
+                  <button onClick={toggleFullscreen} class="text-white hover:text-brandGold transition p-1" title="Pantalla Completa">
+                    {fullscreen ? (
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3 3m12 6V4.5M15 9h4.5M15 9l6-6m-6 12v4.5m0-4.5h4.5m-4.5 0l6 6M9 15v4.5M9 15H4.5m4.5 0l-6 6" />
+                      </svg>
+                    ) : (
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m5.25 11.25v-4.5m0 4.5h-4.5m4.5 0L15 15" />
+                      </svg>
+                    )}
                   </button>
                 </div>
 
               </div>
             </div>
+
           </div>
 
-          {/* Info Details of Stream Content below video player */}
-          <div class="bg-[#12121a]/80 border border-white/5 p-4 rounded-xl shadow mx-4 sm:mx-0">
-            <div class="flex items-center space-x-2 mb-2 text-xs font-bold text-brandPurple uppercase">
-              <span>{stream.category || 'Streaming'}</span>
-              <span>•</span>
-              <span class="text-brandGold uppercase">{stream.type === 'live' ? 'En Vivo' : (stream.type === 'recorded' ? 'Repetición' : 'VOD / Catálogo')}</span>
+          {/* Under player descriptions and actions */}
+          <div class="px-3 sm:px-0 flex justify-between items-start">
+            <div class="space-y-1">
+              <span class="inline-block bg-brandPurple/10 text-brandPurple border border-brandPurple/20 text-[9px] font-black tracking-widest px-2.5 py-0.5 rounded uppercase">
+                {stream.category}
+              </span>
+              <h2 class="text-base font-extrabold text-white leading-snug uppercase">{stream.title}</h2>
+              {stream.description && (
+                <p class="text-xs text-white/50 leading-relaxed max-w-2xl select-text">{stream.description}</p>
+              )}
             </div>
-            <h3 class="text-xl font-bold uppercase text-white leading-tight mb-2 tracking-wide font-title">{stream.title}</h3>
-            <p class="text-sm text-white/60 leading-relaxed">{stream.description || "Transmisión disponible en HD. Utilice el selector de repeticiones si desea guardar la señal."}</p>
+
+            <button 
+              onClick={onClosing}
+              class="flex items-center space-x-1.5 bg-brandBg border border-white/5 hover:bg-white/5 transition text-[10px] font-black px-3.5 py-2 rounded-xl text-white uppercase tracking-wider"
+            >
+              <span>✕</span>
+              <span>Cerrar</span>
+            </button>
           </div>
 
-          {/* Report popup modal dialog */}
-          {showReportModal && (
-            <div class="fixed inset-0 bg-[#0a0a0f]/90 flex items-center justify-center p-4 z-50 backdrop-blur-md select-none animate-fade-in">
-              <div class="bg-[#12121a] border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl relative">
+          {/* Modal popup: Report content */}
+          {reportModalOpen && (
+            <div class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+              <div class="bg-brandSurface border border-white/10 rounded-2xl p-5 w-full max-w-sm relative select-none">
+                <h4 class="text-xs font-black uppercase tracking-widest text-brandGold mb-3">⚠️ Reportar Falla de Transmisión</h4>
+                
+                <div class="space-y-2 mb-4">
+                  {["Sin imagen", "Sin sonido", "Buffering excesivo", "Stream caído"].map((opt) => (
+                    <button 
+                      key={opt}
+                      onClick={() => {
+                        setReportModalOpen(false);
+                        triggerToast(`Reporte enviado: "${opt}". Nuestro equipo está revisando la señal.`);
+                      }}
+                      class="w-full text-left bg-white/5 hover:bg-brandPurple/25 border border-white/5 hover:border-brandPurple/40 rounded-xl px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-white/95 transition"
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+
                 <button 
-                  onClick={() => setShowReportModal(false)}
-                  class="absolute top-4 right-4 text-white/40 hover:text-white"
+                  onClick={() => setReportModalOpen(false)}
+                  class="w-full bg-[#181824] hover:bg-white/5 transition border border-white/5 text-white/55 font-bold uppercase text-[9px] tracking-widest py-2 rounded-xl"
                 >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  CANCELAR
                 </button>
-
-                <h4 class="text-lg font-bold font-title tracking-wider text-red-500 mb-3 uppercase">⚠️ Reportar Transmisión</h4>
-                <p class="text-xs text-white/50 mb-4 leading-normal">
-                  Informa sobre fallas técnicas en este canal. Tu reporte será notificado al técnico de guardia.
-                </p>
-
-                <form onSubmit={handleSendReport} class="space-y-3">
-                  <div class="space-y-2">
-                    <label class="flex items-center space-x-3 text-sm text-white/80 cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={reportChecked.noImg} 
-                        onChange={(e) => setReportChecked({...reportChecked, noImg: e.target.checked})}
-                        class="rounded bg-[#1e1e2d] border-white/10 text-brandPurple focus:ring-brandPurple"
-                      />
-                      <span>Señal sin imagen (Pantalla negra)</span>
-                    </label>
-                    <label class="flex items-center space-x-3 text-sm text-white/80 cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={reportChecked.noSnd} 
-                        onChange={(e) => setReportChecked({...reportChecked, noSnd: e.target.checked})}
-                        class="rounded bg-[#1e1e2d] border-white/10 text-brandPurple focus:ring-brandPurple"
-                      />
-                      <span>Transmisión sin sonido</span>
-                    </label>
-                    <label class="flex items-center space-x-3 text-sm text-white/80 cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={reportChecked.noBuff} 
-                        onChange={(e) => setReportChecked({...reportChecked, noBuff: e.target.checked})}
-                        class="rounded bg-[#1e1e2d] border-white/10 text-brandPurple focus:ring-brandPurple"
-                      />
-                      <span>Carga y buffering constante</span>
-                    </label>
-                    <label class="flex items-center space-x-3 text-sm text-white/80 cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={reportChecked.noStrm} 
-                        onChange={(e) => setReportChecked({...reportChecked, noStrm: e.target.checked})}
-                        class="rounded bg-[#1e1e2d] border-white/10 text-brandPurple focus:ring-brandPurple"
-                      />
-                      <span>Canal caído por completo</span>
-                    </label>
-                  </div>
-
-                  <div class="pt-2">
-                    <label class="block text-xs font-bold text-white/40 uppercase mb-1">Descripción libre del problema (Opcional):</label>
-                    <textarea 
-                      rows="3"
-                      value={reportMsg}
-                      onChange={(e) => setReportMsg(e.target.value)}
-                      placeholder="Agrega otros detalles sobre el estado de la transmisión..."
-                      class="w-full bg-[#1e1e2d] border border-white/10 rounded-xl p-3 text-xs text-white outline-none focus:border-brandPurple focus:ring-1 focus:ring-brandPurple leading-normal"
-                    />
-                  </div>
-
-                  <div class="flex space-x-3 pt-3">
-                    <button 
-                      type="button"
-                      onClick={() => setShowReportModal(false)}
-                      class="flex-1 bg-white/10 hover:bg-white/20 text-white font-bold py-2.5 rounded-lg text-xs tracking-wider uppercase transition"
-                    >
-                      Cancelar
-                    </button>
-                    <button 
-                      type="submit"
-                      class="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-2.5 rounded-lg text-xs tracking-wider uppercase transition border border-red-500"
-                    >
-                      Enviar Reporte
-                    </button>
-                  </div>
-                </form>
               </div>
             </div>
           )}
@@ -1584,8 +1702,9 @@
       );
     }
 
-    // Render root React component
-    const root = ReactDOM.createRoot(document.getElementById('root'));
+    // Mount to absolute system root entry
+    const container = document.getElementById('root');
+    const root = ReactDOM.createRoot(container);
     root.render(<App />);
   </script>
 </body>
