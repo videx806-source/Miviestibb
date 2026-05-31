@@ -8,7 +8,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.aistudio.videxstreaming.vxdxzp"
+        applicationId = "com.aistudio.videxplayer.rnbwzt"
         minSdk = 24
         targetSdk = 34
         versionCode = 2
