@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "VIDEX APP"
+rootProject.name = "VIDEX_APP"
 include(":app")
