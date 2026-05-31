@@ -64,9 +64,9 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     // implementation(libs.androidx.compose.material.icons.extended)
 
-    // ExoPlayer for Live streaming playback
-    implementation(libs.androidx.media3.exoplayer)
-    implementation(libs.androidx.media3.ui)
+    // ExoPlayer for Live streaming playback (Unused, we use WebView for absolute codec compatibility)
+    // implementation(libs.androidx.media3.exoplayer)
+    // implementation(libs.androidx.media3.ui)
 
     // Room Database
     implementation(libs.androidx.room.runtime)

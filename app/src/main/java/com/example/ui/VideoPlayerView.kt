@@ -1,8 +1,10 @@
 package com.example.ui
 
 import android.view.ViewGroup
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.FrameLayout
-import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -24,13 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
 
-@OptIn(UnstableApi::class)
 @Composable
 fun VideoPlayerView(
     streamUrl: String,
@@ -41,28 +37,8 @@ fun VideoPlayerView(
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
     
-    // Remember the ExoPlayer instance
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            playWhenReady = true
-        }
-    }
-
-    // Initialize/update source URL
-    LaunchedEffect(streamUrl) {
-        exoPlayer.setMediaItem(MediaItem.fromUri(streamUrl))
-        exoPlayer.prepare()
-        exoPlayer.play()
-    }
-
-    // Release player
-    DisposableEffect(Unit) {
-        onDispose {
-            exoPlayer.release()
-        }
-    }
-
     // Overlay controls state
     var showControls by remember { mutableStateOf(true) }
     var isPlaying by remember { mutableStateOf(true) }
@@ -73,24 +49,102 @@ fun VideoPlayerView(
     var showVolumeOverlay by remember { mutableStateOf(false) }
     var showBrightnessOverlay by remember { mutableStateOf(false) }
 
-    // Synchronize play state
-    DisposableEffect(exoPlayer) {
-        val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(playing: Boolean) {
-                isPlaying = playing
-            }
-        }
-        exoPlayer.addListener(listener)
-        onDispose {
-            exoPlayer.removeListener(listener)
-        }
-    }
-
     // Auto-disable controller overlay
     LaunchedEffect(showControls, isPlaying) {
         if (showControls && isPlaying) {
             kotlinx.coroutines.delay(4000)
             showControls = false
+        }
+    }
+
+    // HTML / HLS Player configuration loaded inside WebView
+    val playerHtml = remember(streamUrl) {
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.12/dist/hls.min.js"></script>
+            <style>
+                body, html {
+                    margin: 0;
+                    padding: 0;
+                    width: 100%;
+                    height: 100%;
+                    background-color: #000000;
+                    overflow: hidden;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                }
+                video {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: contain;
+                    outline: none;
+                }
+            </style>
+        </head>
+        <body>
+            <video id="vid" autoplay playsinline style="background: black;"></video>
+            <script>
+                var video = document.getElementById('vid');
+                var streamUrl = "$streamUrl";
+                
+                function playVideo() {
+                    video.play();
+                }
+                
+                function pauseVideo() {
+                    video.pause();
+                }
+                
+                function setVolumeValue(val) {
+                    video.volume = val;
+                }
+                
+                if (Hls.isSupported()) {
+                    var hls = new Hls({
+                        enableWorker: true,
+                        lowLatencyMode: true
+                    });
+                    hls.loadSource(streamUrl);
+                    hls.attachMedia(video);
+                    hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                        video.play().catch(function(e) {
+                            console.log("Autoplay blocked: " + e);
+                        });
+                    });
+                    hls.on(Hls.Events.ERROR, function (event, data) {
+                        if (data.fatal) {
+                            switch (data.type) {
+                                case Hls.ErrorTypes.NETWORK_ERROR:
+                                    hls.startLoad();
+                                    break;
+                                case Hls.ErrorTypes.MEDIA_ERROR:
+                                    hls.recoverMediaError();
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                    });
+                } else if (video.canPlayType('application/vnd.apple.mpegurl') || streamUrl.endsWith('.mp4')) {
+                    video.src = streamUrl;
+                    video.play().catch(function(e) {
+                        console.log("Autoplay blocked: " + e);
+                    });
+                }
+            </script>
+        </body>
+        </html>
+        """.trimIndent()
+    }
+
+    // Update WebView when dynamic streamUrl changes
+    LaunchedEffect(playerHtml, webViewRef) {
+        webViewRef?.let { webView ->
+            webView.loadDataWithBaseURL("https://localhost", playerHtml, "text/html", "UTF-8", null)
         }
     }
 
@@ -100,17 +154,26 @@ fun VideoPlayerView(
             .background(Color.Black)
             .clickable { showControls = !showControls }
     ) {
-        // Platform ExoPlayer Surface View
+        // Platform WebView Surface View
         AndroidView(
             factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = false // Use our complete custom overlay
+                WebView(ctx).apply {
                     layoutParams = FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.mediaPlaybackRequiresUserGesture = false
+                    settings.useWideViewPort = true
+                    settings.loadWithOverviewMode = true
+                    webViewClient = WebViewClient()
+                    webChromeClient = WebChromeClient()
+                    webViewRef = this
                 }
+            },
+            update = { webView ->
+                webViewRef = webView
             },
             modifier = Modifier.fillMaxSize()
         )
@@ -136,7 +199,7 @@ fun VideoPlayerView(
                         } else {
                             // Right side = Volume
                             volumeLevel = (volumeLevel - dragAmount.y / 800f).coerceIn(0f, 1f)
-                            exoPlayer.volume = volumeLevel
+                            webViewRef?.evaluateJavascript("setVolumeValue($volumeLevel);", null)
                             showVolumeOverlay = true
                         }
                     }
@@ -278,7 +341,13 @@ fun VideoPlayerView(
                 // Play / Pause central button
                 IconButton(
                     onClick = {
-                        if (isPlaying) exoPlayer.pause() else exoPlayer.play()
+                        if (isPlaying) {
+                            webViewRef?.evaluateJavascript("pauseVideo();", null)
+                            isPlaying = false
+                        } else {
+                            webViewRef?.evaluateJavascript("playVideo();", null)
+                            isPlaying = true
+                        }
                     },
                     modifier = Modifier
                         .size(72.dp)

@@ -5,9 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -48,6 +51,13 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainAppScreen(viewModel: MediaViewModel) {
+    val appReady by viewModel.appReady.collectAsState()
+    val loadStatus by viewModel.loadStatus.collectAsState()
+    val blockingUpdate by viewModel.blockingUpdate.collectAsState()
+    val nonBlockingUpdate by viewModel.nonBlockingUpdate.collectAsState()
+    val systemMessage by viewModel.systemMessage.collectAsState()
+    val isSmsDialogOpen by viewModel.isSmsDialogOpen.collectAsState()
+
     val activeTab by viewModel.activeTab.collectAsState()
     val subTab by viewModel.subTab.collectAsState()
     val selectedVideo by viewModel.selectedVideo.collectAsState()
@@ -63,28 +73,39 @@ fun MainAppScreen(viewModel: MediaViewModel) {
     val recordingsList by viewModel.recordings.collectAsState()
     val downloadsList by viewModel.downloads.collectAsState()
 
-    if (selectedVideo != null) {
-        val video = selectedVideo!!
-        val mins = recordingSeconds / 60
-        val secs = recordingSeconds % 60
-        val recTimeString = String.format("%02d:%02d", mins, secs)
+    val connectivityMode by viewModel.connectivityMode.collectAsState()
+    val isVerifying by viewModel.isVerifyingConnection.collectAsState()
 
-        VideoPlayerView(
-            streamUrl = video.streamUrl,
-            title = video.title,
-            isRecording = isRecording,
-            recordingTime = recTimeString,
-            onToggleRecording = { viewModel.toggleRecording() },
-            onClose = { viewModel.setSelectedVideo(null) }
+    if (!appReady) {
+        InitialSplashScreen(
+            status = loadStatus,
+            onRetry = { viewModel.cargarTodo() }
         )
+    } else if (blockingUpdate != null) {
+        BlockingUpdateScreen(blockingUpdate!!)
     } else {
-        Scaffold(
-            bottomBar = {
-                BottomNavBar(
-                    activeTab = activeTab,
-                    onTabSelected = { viewModel.setActiveTab(it) }
-                )
-            },
+        if (selectedVideo != null) {
+            val video = selectedVideo!!
+            val mins = recordingSeconds / 60
+            val secs = recordingSeconds % 60
+            val recTimeString = String.format("%02d:%02d", mins, secs)
+
+            VideoPlayerView(
+                streamUrl = video.streamUrl,
+                title = video.title,
+                isRecording = isRecording,
+                recordingTime = recTimeString,
+                onToggleRecording = { viewModel.toggleRecording() },
+                onClose = { viewModel.setSelectedVideo(null) }
+            )
+        } else {
+            Scaffold(
+                bottomBar = {
+                    BottomNavBar(
+                        activeTab = activeTab,
+                        onTabSelected = { viewModel.setActiveTab(it) }
+                    )
+                },
             containerColor = MaterialTheme.colorScheme.background
         ) { innerPadding ->
             Column(
@@ -93,8 +114,8 @@ fun MainAppScreen(viewModel: MediaViewModel) {
                     .padding(innerPadding)
                     .statusBarsPadding()
             ) {
-                // Header Panel
-                HeaderComponent()
+                // Header Panel with Connection Simulator Toggle
+                HeaderComponent(viewModel)
 
                 // Search Panel
                 SearchBarComponent(
@@ -102,28 +123,48 @@ fun MainAppScreen(viewModel: MediaViewModel) {
                     onQueryChanged = { viewModel.setQuery(it) }
                 )
 
-                // Tab Routing Content
-                when (activeTab) {
-                    "vivo" -> LiveStreamsTab(
-                        viewModel = viewModel,
-                        searchQuery = searchQuery
-                    )
-                    "canal" -> ChannelsTab(
-                        viewModel = viewModel,
-                        searchQuery = searchQuery
-                    )
-                    "pelicula" -> MoviesTab(
-                        viewModel = viewModel,
-                        searchQuery = searchQuery
-                    )
-                    "grabaciones" -> GrabacionesAndDescargasTab(
-                        viewModel = viewModel,
-                        subTab = subTab,
-                        onSubTabSelected = { viewModel.setSubTab(it) },
-                        recordings = recordingsList,
-                        downloads = downloadsList,
-                        searchQuery = searchQuery
-                    )
+                // Connectivity state loading spinner overlay
+                if (isVerifying) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                "Comprobando conexión con servidor central...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Gray
+                            )
+                        }
+                    }
+                } else {
+                    // Tab Routing Content
+                    when (activeTab) {
+                        "vivo" -> LiveStreamsTab(
+                            viewModel = viewModel,
+                            searchQuery = searchQuery
+                        )
+                        "canal" -> ChannelsTab(
+                            viewModel = viewModel,
+                            searchQuery = searchQuery
+                        )
+                        "pelicula" -> MoviesTab(
+                            viewModel = viewModel,
+                            searchQuery = searchQuery
+                        )
+                        "grabaciones" -> GrabacionesAndDescargasTab(
+                            viewModel = viewModel,
+                            subTab = subTab,
+                            onSubTabSelected = { viewModel.setSubTab(it) },
+                            recordings = recordingsList,
+                            downloads = downloadsList,
+                            searchQuery = searchQuery
+                        )
+                    }
                 }
             }
 
@@ -164,6 +205,412 @@ fun MainAppScreen(viewModel: MediaViewModel) {
                 )
             }
 
+            if (isSmsDialogOpen && systemMessage != null) {
+                AlertDialog(
+                    onDismissRequest = { viewModel.setSmsDialogOpen(false) },
+                    confirmButton = {
+                        Button(
+                            onClick = { viewModel.setSmsDialogOpen(false) },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("ENTENDIDO")
+                        }
+                    },
+                    icon = {
+                        Icon(imageVector = Icons.Default.Warning, contentDescription = "Aviso", tint = MaterialTheme.colorScheme.primary)
+                    },
+                    title = { Text("Aviso de VIDEX") },
+                    text = { Text(systemMessage!!) },
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            }
+
+            // IPTV Sources Sourcing control overlay Dialog
+            val sourcesDialogOpened by viewModel.sourcesDialogOpened.collectAsState()
+            val isSyncing by viewModel.isSyncing.collectAsState()
+            val syncLogs by viewModel.syncLogs.collectAsState()
+            val activeSourcePresetName by viewModel.activeSourcePresetName.collectAsState()
+            var m3uInputText by remember { mutableStateOf("") }
+            var tabSelectedPresetOrM3u by remember { mutableStateOf(0) } // 0: Presets, 1: M3U Manual
+
+            if (sourcesDialogOpened) {
+                AlertDialog(
+                    onDismissRequest = { if (!isSyncing) viewModel.setSourcesDialogOpened(false) },
+                    confirmButton = {
+                        Button(
+                            onClick = { viewModel.setSourcesDialogOpened(false) },
+                            enabled = !isSyncing,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("ENTENDIDO")
+                        }
+                    },
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    title = {
+                        Text(
+                            "📁 GESTIÓN DE FUENTES IPTV",
+                            fontWeight = FontWeight.Black,
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    text = {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 420.dp)
+                                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                        ) {
+                            Text(
+                                "Elige un servidor sincronizado o introduce un enlace / lista IPTV en formato estándar M3U.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.LightGray
+                            )
+
+                            // Tabs inside Dialog
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                                    .padding(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(
+                                            if (tabSelectedPresetOrM3u == 0) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable { tabSelectedPresetOrM3u = 0 }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "Servidores",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = if (tabSelectedPresetOrM3u == 0) Color.White else Color.Gray
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(
+                                            if (tabSelectedPresetOrM3u == 1) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable { tabSelectedPresetOrM3u = 1 }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "Importar M3U",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = if (tabSelectedPresetOrM3u == 1) Color.White else Color.Gray
+                                    )
+                                }
+                            }
+
+                            if (tabSelectedPresetOrM3u == 0) {
+                                // Preset Sources List
+                                Text(
+                                    "Servidores en la Nube Disponibles:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                
+                                val presets = listOf("Videx Central Oficial", "IPTV España Pública", "Deportes 24h Premium")
+                                presets.forEach { pName ->
+                                    val isActive = pName == activeSourcePresetName
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .border(
+                                                1.dp,
+                                                if (isActive) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.1f),
+                                                RoundedCornerShape(12.dp)
+                                            )
+                                            .background(
+                                                if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent,
+                                                RoundedCornerShape(12.dp)
+                                            )
+                                            .clickable(enabled = !isSyncing) {
+                                                viewModel.syncFromSourcePreset(pName)
+                                            }
+                                            .padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = pName,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White,
+                                                fontSize = 14.sp
+                                            )
+                                            Text(
+                                                text = when(pName) {
+                                                    "Videx Central Oficial" -> "Grilla nacional de alta calidad integrada."
+                                                    "IPTV España Pública" -> "Frecuencias públicas en vivo (RTVE, Mediaset)."
+                                                    else -> "Señales especializadas de deportes y motor."
+                                                },
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontSize = 11.sp,
+                                                color = Color.Gray
+                                            )
+                                        }
+                                        if (isActive) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .background(Color.Green, RoundedCornerShape(4.dp))
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                // M3U Manual Input Form
+                                Text(
+                                    "Pega tu lista M3U aquí:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+
+                                TextField(
+                                    value = m3uInputText,
+                                    onValueChange = { m3uInputText = it },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(115.dp)
+                                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
+                                    placeholder = {
+                                        Text(
+                                            "#EXTM3U\n#EXTINF:-1 group-title=\"Deportes\",Canal De Prueba 1\nhttps://url-stream.m3u8",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color.Gray
+                                        )
+                                    },
+                                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                                        unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    // Button to fill sample M3U
+                                    OutlinedButton(
+                                        onClick = {
+                                            m3uInputText = """
+                                                #EXTM3U
+                                                #EXTINF:-1 group-title="Deportes" tvg-logo="https://videx.es/logo.png",Gol TV España (M3U Canales)
+                                                https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
+                                                #EXTINF:-1 group-title="Cine" tvg-logo="https://videx.es/cine.png",Cine Acción Retro
+                                                https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8
+                                                #EXTINF:-1 group-title="Generalista",Informativo TV España (M3U)
+                                                https://playertest.longtailvideo.com/adaptive/vimeo/282848/playlist.m3u8
+                                            """.trimIndent()
+                                        },
+                                        enabled = !isSyncing,
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Text("CARGAR DEMO", fontSize = 11.sp)
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            viewModel.parseAndImportM3uContent(m3uInputText)
+                                        },
+                                        enabled = !isSyncing && m3uInputText.isNotBlank(),
+                                        modifier = Modifier.weight(1.2f),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Text("IMPORTAR M3U", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            // Sourcing logs console
+                            Text(
+                                "Registro de Operación de Enlace:",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Black,
+                                color = Color.Gray,
+                                letterSpacing = 0.5.sp
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(100.dp)
+                                    .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                                    .padding(8.dp)
+                            ) {
+                                androidx.compose.foundation.lazy.LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    items(syncLogs) { logLine ->
+                                        Text(
+                                            text = logLine,
+                                            color = if (logLine.contains("❌") || logLine.contains("⚠️")) Color.Red
+                                                    else if (logLine.contains("✅") || logLine.contains("🎉") || logLine.contains("🌟") || logLine.contains("⚡")) Color.Green
+                                                    else Color.LightGray,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            fontSize = 11.sp,
+                                            lineHeight = 14.sp
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (isSyncing) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "Estableciendo canal de syncing...",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.Gray
+                                    )
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+
+            // QR Sincronización TV overlay Dialog
+            val qrLightboxOpen by viewModel.qrLightboxOpen.collectAsState()
+            if (qrLightboxOpen) {
+                AlertDialog(
+                    onDismissRequest = { viewModel.setQrLightboxOpen(false) },
+                    confirmButton = {
+                        Button(
+                            onClick = { viewModel.setQrLightboxOpen(false) },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("CERRAR")
+                        }
+                    },
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    title = {
+                        Text(
+                            "📺 VINCULAR SMART TV",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    text = {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                "Sincroniza Videx en tu Smart TV. Escanea este código QR con la cámara de tu móvil para vincular tu cuenta y transmitir en tu pantalla.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.LightGray,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            
+                            // High-tech Canvas drawn programmatic Mockup QR Code
+                            Box(
+                                modifier = Modifier
+                                    .size(160.dp)
+                                    .background(Color.White, RoundedCornerShape(12.dp))
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                                    val sizePx = size.width
+                                    val gridSize = 13
+                                    val cellSize = sizePx / gridSize
+                                    
+                                    // Draw positional markers and random pixels
+                                    for (row in 0 until gridSize) {
+                                        for (col in 0 until gridSize) {
+                                            val isPositionMarker = 
+                                                (row < 4 && col < 4) || // Top-left
+                                                (row < 4 && col >= gridSize - 4) || // Top-right
+                                                (row >= gridSize - 4 && col < 4) // Bottom-left
+                                            
+                                            if (isPositionMarker) {
+                                                val isBorder = row == 0 || row == 3 || col == 0 || col == 3 ||
+                                                               row == 0 || row == 3 || col == gridSize - 1 || col == gridSize - 4 ||
+                                                               row == gridSize - 1 || row == gridSize - 4 || col == 0 || col == 3
+                                                
+                                                val isInner = row in 1..2 && col in 1..2 ||
+                                                              row in 1..2 && col in (gridSize - 3)..(gridSize - 2) ||
+                                                              row in (gridSize - 3)..(gridSize - 2) && col in 1..2
+                                                if (isBorder || isInner) {
+                                                    drawRect(
+                                                        color = Color.Black,
+                                                        topLeft = androidx.compose.ui.geometry.Offset(col * cellSize, row * cellSize),
+                                                        size = androidx.compose.ui.geometry.Size(cellSize, cellSize)
+                                                    )
+                                                }
+                                            } else {
+                                                val seed = (row * 37 + col * 73) % 4
+                                                if (seed == 1 || seed == 3) {
+                                                    drawRect(
+                                                        color = Color.Black,
+                                                        topLeft = androidx.compose.ui.geometry.Offset(col * cellSize, row * cellSize),
+                                                        size = androidx.compose.ui.geometry.Size(cellSize, cellSize)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Text(
+                                "Código de Vinculación: 462-VXR",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.primary,
+                                letterSpacing = 2.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Válido durante 5 minutos",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.Gray
+                            )
+                        }
+                    }
+                )
+            }
+
             // Custom Notification Overlays (Toast style)
             if (toastMessage != null) {
                 Box(
@@ -191,9 +638,13 @@ fun MainAppScreen(viewModel: MediaViewModel) {
         }
     }
 }
+}
 
 @Composable
-fun HeaderComponent() {
+fun HeaderComponent(viewModel: MediaViewModel) {
+    val connectivityMode by viewModel.connectivityMode.collectAsState()
+    val isVerifying by viewModel.isVerifyingConnection.collectAsState()
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -201,7 +652,7 @@ fun HeaderComponent() {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "VIDEX APP",
                 fontWeight = FontWeight.Black,
@@ -220,23 +671,80 @@ fun HeaderComponent() {
         
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .background(Color.Red.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Box(
+            // IPTV Sources Settings Button
+            IconButton(
+                onClick = { viewModel.setSourcesDialogOpened(true) },
                 modifier = Modifier
-                    .size(8.dp)
-                    .background(Color.Red, RoundedCornerShape(4.dp))
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "NATIVO",
-                color = Color.Red,
-                fontWeight = FontWeight.Black,
-                style = MaterialTheme.typography.labelSmall,
-                letterSpacing = 0.5.sp
-            )
+                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                    .size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Gestionar Fuentes",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            // TV Sync Code Button
+            IconButton(
+                onClick = { viewModel.setQrLightboxOpen(true) },
+                modifier = Modifier
+                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                    .size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = "Sincronizar Smart TV",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            // Connection Toggle State Badge
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .background(
+                        if (isVerifying) Color.LightGray.copy(alpha = 0.1f)
+                        else if (connectivityMode == "LINEA") Color.Green.copy(alpha = 0.15f)
+                        else Color.Red.copy(alpha = 0.15f),
+                        RoundedCornerShape(12.dp)
+                    )
+                    .clickable(enabled = !isVerifying) {
+                        if (connectivityMode == "LINEA") {
+                            viewModel.setConnectivityMode("SIN_CONEXION")
+                        } else {
+                            viewModel.setConnectivityMode("LINEA")
+                        }
+                    }
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(
+                            if (isVerifying) Color.LightGray
+                            else if (connectivityMode == "LINEA") Color.Green
+                            else Color.Red,
+                            RoundedCornerShape(4.dp)
+                        )
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isVerifying) "COMPROBANDO"
+                           else if (connectivityMode == "LINEA") "ONLINE"
+                           else "SIN CONEXIÓN",
+                    color = if (isVerifying) Color.LightGray
+                            else if (connectivityMode == "LINEA") Color.Green
+                            else Color.Red,
+                    fontWeight = FontWeight.Black,
+                    style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 0.5.sp
+                )
+            }
         }
     }
 }
@@ -338,31 +846,132 @@ fun BottomNavBar(activeTab: String, onTabSelected: (String) -> Unit) {
 }
 
 @Composable
+fun CategorySelectionRow(
+    categories: List<String>,
+    selectedCategory: String,
+    onCategorySelected: (String) -> Unit
+) {
+    androidx.compose.foundation.lazy.LazyRow(
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        items(categories) { category ->
+            val isSelected = category == selectedCategory
+            Box(
+                modifier = Modifier
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.05f),
+                        RoundedCornerShape(12.dp)
+                    )
+                    .clickable { onCategorySelected(category) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = category,
+                    color = if (isSelected) Color.White else Color.Gray,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun OfflineWarningComponent() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.2f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Sin Conexión",
+                    tint = Color.Red,
+                    modifier = Modifier.size(64.dp)
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(
+                    text = "MODO SIN CONEXIÓN",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 20.sp,
+                    color = Color.White,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Contenido no disponible en modo sin conexión. Ve al menú de Grabaciones para reproducir tus descargas locales de forma segura.",
+                    color = Color.LightGray.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    lineHeight = 22.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun LiveStreamsTab(
     viewModel: MediaViewModel,
     searchQuery: String
 ) {
-    val filteredEvents = remember(searchQuery) {
-        viewModel.vivoEvents.filter {
-            it.title.contains(searchQuery, ignoreCase = true) ||
-            it.subtitle.contains(searchQuery, ignoreCase = true)
+    val connectivityMode by viewModel.connectivityMode.collectAsState()
+    if (connectivityMode == "SIN_CONEXION") {
+        OfflineWarningComponent()
+        return
+    }
+
+    val selectedCategory by viewModel.selectedLiveCategory.collectAsState()
+    val categories = listOf("Todos", "Fútbol", "Motor", "Baloncesto")
+    val vivoEvents by viewModel.vivoEvents.collectAsState()
+
+    val filteredEvents = remember(vivoEvents, searchQuery, selectedCategory) {
+        vivoEvents.filter {
+            val matchesQuery = it.title.contains(searchQuery, ignoreCase = true) ||
+                    it.subtitle.contains(searchQuery, ignoreCase = true)
+            val matchesCategory = selectedCategory == "Todos" || it.category == selectedCategory
+            matchesQuery && matchesCategory
         }
     }
 
-    if (filteredEvents.isEmpty()) {
-        EmptyStateComponent(message = "No se encontraron eventos en vivo que coincidan con la búsqueda.")
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(filteredEvents) { event ->
-                MediaCard(
-                    video = event,
-                    onPlay = { viewModel.setSelectedVideo(event) },
-                    onDownload = { viewModel.downloadVideo(event) }
-                )
+    Column(modifier = Modifier.fillMaxSize()) {
+        CategorySelectionRow(
+            categories = categories,
+            selectedCategory = selectedCategory,
+            onCategorySelected = { viewModel.setLiveCategory(it) }
+        )
+
+        if (filteredEvents.isEmpty()) {
+            EmptyStateComponent(message = "No se encontraron eventos en vivo que coincidan con la búsqueda.")
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(filteredEvents) { event ->
+                    MediaCard(
+                        video = event,
+                        onPlay = { viewModel.setSelectedVideo(event) },
+                        onDownload = { viewModel.downloadVideo(event) }
+                    )
+                }
             }
         }
     }
@@ -373,27 +982,47 @@ fun ChannelsTab(
     viewModel: MediaViewModel,
     searchQuery: String
 ) {
-    val filteredCanales = remember(searchQuery) {
-        viewModel.canales.filter {
-            it.title.contains(searchQuery, ignoreCase = true) ||
-            it.subtitle.contains(searchQuery, ignoreCase = true)
+    val connectivityMode by viewModel.connectivityMode.collectAsState()
+    if (connectivityMode == "SIN_CONEXION") {
+        OfflineWarningComponent()
+        return
+    }
+
+    val selectedCategory by viewModel.selectedChannelCategory.collectAsState()
+    val categories = listOf("Todos", "Cine", "Deportes", "Documentales", "Noticias")
+    val canales by viewModel.canales.collectAsState()
+
+    val filteredCanales = remember(canales, searchQuery, selectedCategory) {
+        canales.filter {
+            val matchesQuery = it.title.contains(searchQuery, ignoreCase = true) ||
+                    it.subtitle.contains(searchQuery, ignoreCase = true)
+            val matchesCategory = selectedCategory == "Todos" || it.category == selectedCategory
+            matchesQuery && matchesCategory
         }
     }
 
-    if (filteredCanales.isEmpty()) {
-        EmptyStateComponent(message = "No se encontraron canales que coincidan con la búsqueda.")
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(filteredCanales) { canal ->
-                MediaCard(
-                    video = canal,
-                    onPlay = { viewModel.setSelectedVideo(canal) },
-                    onDownload = { viewModel.downloadVideo(canal) }
-                )
+    Column(modifier = Modifier.fillMaxSize()) {
+        CategorySelectionRow(
+            categories = categories,
+            selectedCategory = selectedCategory,
+            onCategorySelected = { viewModel.setChannelCategory(it) }
+        )
+
+        if (filteredCanales.isEmpty()) {
+            EmptyStateComponent(message = "No se encontraron canales que coincidan con la búsqueda.")
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(filteredCanales) { canal ->
+                    MediaCard(
+                        video = canal,
+                        onPlay = { viewModel.setSelectedVideo(canal) },
+                        onDownload = { viewModel.downloadVideo(canal) }
+                    )
+                }
             }
         }
     }
@@ -404,27 +1033,123 @@ fun MoviesTab(
     viewModel: MediaViewModel,
     searchQuery: String
 ) {
-    val filteredMovies = remember(searchQuery) {
-        viewModel.peliculas.filter {
-            it.title.contains(searchQuery, ignoreCase = true) ||
-            it.subtitle.contains(searchQuery, ignoreCase = true)
+    val connectivityMode by viewModel.connectivityMode.collectAsState()
+    if (connectivityMode == "SIN_CONEXION") {
+        OfflineWarningComponent()
+        return
+    }
+
+    val selectedCategory by viewModel.selectedMovieCategory.collectAsState()
+    val categories = listOf("Todas", "Ciencia Ficción", "Drama", "Animación", "Suspenso")
+    val peliculas by viewModel.peliculas.collectAsState()
+
+    val filteredMovies = remember(peliculas, searchQuery, selectedCategory) {
+        peliculas.filter {
+            val matchesQuery = it.title.contains(searchQuery, ignoreCase = true) ||
+                    it.subtitle.contains(searchQuery, ignoreCase = true)
+            val matchesCategory = selectedCategory == "Todas" || it.category == selectedCategory
+            matchesQuery && matchesCategory
         }
     }
 
-    if (filteredMovies.isEmpty()) {
-        EmptyStateComponent(message = "No se encontraron películas o series que coincidan con la búsqueda.")
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    Column(modifier = Modifier.fillMaxSize()) {
+        CategorySelectionRow(
+            categories = categories,
+            selectedCategory = selectedCategory,
+            onCategorySelected = { viewModel.setMovieCategory(it) }
+        )
+
+        Box(modifier = Modifier.weight(1f)) {
+            if (filteredMovies.isEmpty()) {
+                EmptyStateComponent(message = "No se encontraron películas o series que coincidan con la búsqueda.")
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(filteredMovies) { movie ->
+                        MediaCard(
+                            video = movie,
+                            onPlay = { viewModel.setSelectedVideo(movie) },
+                            onDownload = { viewModel.downloadVideo(movie) }
+                        )
+                    }
+                }
+            }
+        }
+
+        var isDirectExpanded by remember { mutableStateOf(false) }
+        var directUrlInput by remember { mutableStateOf("") }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(16.dp)
         ) {
-            items(filteredMovies) { movie ->
-                MediaCard(
-                    video = movie,
-                    onPlay = { viewModel.setSelectedVideo(movie) },
-                    onDownload = { viewModel.downloadVideo(movie) }
-                )
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { isDirectExpanded = !isDirectExpanded },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "🔍 ¿No encuentras tu película?",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Icon(
+                        imageVector = if (isDirectExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Expandir búsqueda directa de SwPlayer",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                if (isDirectExpanded) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "Búscala en h5.swplayer.com, copia la URL y pégala aquí para reproducirla o descargarla automáticamente:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.LightGray
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextField(
+                            value = directUrlInput,
+                            onValueChange = { directUrlInput = it },
+                            placeholder = { Text("https://h5.swplayer.com/...", fontSize = 12.sp, color = Color.Gray) },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodySmall.copy(color = Color.White),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                                unfocusedContainerColor = Color.Black.copy(alpha = 0.2f),
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        Button(
+                            onClick = {
+                                if (directUrlInput.isNotBlank()) {
+                                    viewModel.openDirectSwPlayerUrl(directUrlInput)
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("▶ ABRIR", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         }
     }
@@ -501,6 +1226,7 @@ fun MediaCard(
                     }
                 }
 
+                val isLocked = video.year == "CANDADO"
                 IconButton(
                     onClick = onPlay,
                     modifier = Modifier
@@ -508,12 +1234,12 @@ fun MediaCard(
                         .align(Alignment.Center)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Boton reproducir",
+                        imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.PlayArrow,
+                        contentDescription = if (isLocked) "Contenido bloqueado" else "Boton reproducir",
                         tint = Color.White,
                         modifier = Modifier
                             .size(54.dp)
-                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(27.dp))
+                            .background(if (isLocked) Color(0xFFC62828) else MaterialTheme.colorScheme.primary, RoundedCornerShape(27.dp))
                             .padding(12.dp)
                     )
                 }
@@ -819,3 +1545,208 @@ fun EmptyStateComponent(message: String) {
         }
     }
 }
+
+@Composable
+fun InitialSplashScreen(status: String, onRetry: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0A0A0F)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Text(
+                text = "VIDEX",
+                fontWeight = FontWeight.Black,
+                fontSize = 54.sp,
+                color = Color(0xFFF5C518),
+                letterSpacing = 4.sp
+            )
+            Text(
+                text = "PLATAFORMA DE STREAMING",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.Gray,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp
+            )
+            
+            Spacer(modifier = Modifier.height(64.dp))
+            
+            if (status == "Sin Conexión") {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Sin conexión",
+                    tint = Color.Red,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "VIDEX requiere conexión de red",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.LightGray,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = onRetry,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5C518))
+                ) {
+                    Text("🔄 REINTENTAR", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                CircularProgressIndicator(
+                    color = Color(0xFFF5C518),
+                    modifier = Modifier.size(48.dp),
+                    strokeWidth = 4.dp
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.LightGray,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(64.dp))
+            Text(
+                text = "v2.3.3",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.DarkGray
+            )
+        }
+    }
+}
+
+@Composable
+fun BlockingUpdateScreen(update: com.example.ui.UpdateInfo) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0A0A0F)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Text(
+                text = "VIDEX",
+                fontWeight = FontWeight.Black,
+                fontSize = 32.sp,
+                color = Color(0xFFF5C518)
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = "Update status",
+                tint = Color(0xFFF5C518),
+                modifier = Modifier.size(64.dp)
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = update.title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = update.description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.LightGray,
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            if (update.cambios.isNotEmpty()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF12121A)),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Novedades:",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = Color(0xFFF5C518),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        update.cambios.forEach { cambio ->
+                            Text(
+                                text = "• $cambio",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.LightGray,
+                                modifier = Modifier.padding(vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            Button(
+                onClick = { /* Download */ },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5C518)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "⬇ DESCARGAR APK",
+                    color = Color.Black,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Versión actual: v2.3.3  →  Requerida: v${update.versionMinima}",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.Gray
+            )
+        }
+    }
+}
+
+@Composable
+fun UpdateBanner(update: com.example.ui.UpdateInfo, onDismiss: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5C518)),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "⬆️ ¡Nueva versión v${update.versionActual} disponible!",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                Text(
+                    text = update.title,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Black.copy(alpha = 0.8f)
+                )
+            }
+            Row {
+                TextButton(onClick = { /* Download */ }) {
+                    Text("Descargar", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Cerrar", tint = Color.Black)
+                }
+            }
+        }
+    }
+}
+
