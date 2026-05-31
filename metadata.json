@@ -1,0 +1,6 @@
+{
+  "name": "VIDEX APP",
+  "description": "Aplicación de streaming estilo APK nativa de eventos en vivo, canales, películas y series.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
